@@ -20,6 +20,7 @@
 PreSetup("MQ2Bot");
 
 // defines
+#define NewSource 1
 #define	TargetIT(X)			*(PSPAWNINFO*)ppTarget=X
 #define	ADD_HP vAdds[0]->HPCurrent*100/vAdds[0]->HPMax
 #define	ISINDEX() (Index[0])
@@ -160,6 +161,7 @@ void		SpellType(PSPELL pSpell);
 bool		ValidDet(PSPELL pSpell, PSPAWNINFO Target);
 bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 #pragma endregion FunctionDeclarations
+
 // function struct -- has to be after the FunctionDeclarations because it uses them
 typedef void(*CheckFunction)(vector<_BotSpells>*, int*);
 struct CheckFunc
@@ -1229,15 +1231,15 @@ bool sortByPriority(const BotSpells &lhs, const BotSpells &rhs) { return lhs.Pri
 
 void SortSpellVector(vector<_BotSpells> v)
 {
-	for (int i = 0; i < v.size(); i++)
+	/*for (int i = 0; i < v.size(); i++)
 	{
 		WriteChatf("Original order %d: %s | Priority: %d", i, v[i].SpellName, v[i].Priority);
-	}
+	}*/
 	sort(v.begin(), v.end(), sortByPriority);
-	for (int i = 0; i < v.size(); i++)
-	{
-		WriteChatf("New order %d: %s | Priority: %d", i, v[i].SpellName, v[i].Priority);
-	}
+	//for (int i = 0; i < v.size(); i++)
+	//{
+	//	WriteChatf("New order %d: %s | Priority: %d", i, v[i].SpellName, v[i].Priority);
+	//}
 }
 
 void SpellCategory(PSPELL pSpell)
@@ -1932,10 +1934,10 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	DebugWrite("BotCommand");
 	DurationSetup();
 	CreateAA();
-	CreateDisc();
-	CreateHeal();
+	//CreateDisc();
+	//CreateHeal();
 
-	CheckMemmedSpells();
+	//CheckMemmedSpells();
 	SortSpellVector(vMemmedSpells);
 }
 void MemmedCommand(PSPAWNINFO pChar, PCHAR szLine)
@@ -2057,7 +2059,6 @@ PLUGIN_API VOID OnPulse(VOID)
 		return;
 	CheckMaster();
 }
-//old end configure
 
 #pragma endregion Loading
 
