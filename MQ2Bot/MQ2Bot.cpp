@@ -3,18 +3,18 @@
 _SPAWNS KillTarget; // we always store the current kill target here
 vector<_Spawns> vGroup, vXTarget, vAdds; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
 // to use discs: pCharData->DoCombatAbility(vMaster[i].ID);
-try 
+try
 {
-	if(pSpawn) 
-	{
-		SPAWNINFO tSpawn;
-		memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
-		RemoveFromNotify(&tSpawn, true);
-	}
-} 
+if(pSpawn)
+{
+SPAWNINFO tSpawn;
+memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
+RemoveFromNotify(&tSpawn, true);
+}
+}
 catch(...)
 {
-	DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
+DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 }
 
 */
@@ -24,6 +24,7 @@ catch(...)
 #define MMOBUGS_LOADER
 // Can safely ignore these warnings
 //#pragma warning ( disable : 4710 4365 4018 4244 4505 4189 4101 4100 4482 )
+#pragma warning( push )
 #pragma warning ( disable : 4482 )
 // includes
 #include "../MQ2Plugin.h"
@@ -112,7 +113,7 @@ enum OPTIONS { // used to check routines automatically
 enum SKILLTYPES { TYPE_SPELL = 1, TYPE_AA = 2, TYPE_ITEM = 3, TYPE_DISC = 4 }; // struct for spell data, how to use the spell, and how the spell was used
 
 
-// structs
+																			   // structs
 struct _BotSpells;
 
 typedef struct _BotSpells // has to be before the FunctionDeclarations because a bunch use it
@@ -145,7 +146,7 @@ typedef struct _BotSpells // has to be before the FunctionDeclarations because a
 	int					CastTime;				// Casting time
 	DWORD				TargetID;				// Id of target i want to cast on
 	int					IniMatch;				// what spell number is this in the ini, if any.
-	// save this just in case:  void(*CheckFunc)(std::vector<_BotSpells> &, int);
+												// save this just in case:  void(*CheckFunc)(std::vector<_BotSpells> &, int);
 	void(*CheckFunc)(int);
 } BotSpells, *PBotSpells;
 
@@ -234,13 +235,13 @@ bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 
 #pragma region VariableDefinitions
 // bool declares
-bool  BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded=false;
+bool  BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded = false;
 
 // char declares
-char BodyTypeFix[MAX_STRING] = { 0 },CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 }, INISection[MAX_STRING] = { 0 }, spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 };
+char BodyTypeFix[MAX_STRING] = { 0 }, CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 }, INISection[MAX_STRING] = { 0 }, spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 };
 
 // int declares
-int	AnnounceAdds = 1,AnnounceEcho = 1,AnnounceEQBC = 0, AssistAt = 100, AssistRange = 100, DefaultGem = 1, dotExtend = 0, hotExtend = 0, mezExtend = 0;
+int	AnnounceAdds = 1, AnnounceEcho = 1, AnnounceEQBC = 0, AssistAt = 100, AssistRange = 100, DefaultGem = 1, dotExtend = 0, hotExtend = 0, mezExtend = 0;
 
 // float declares
 float benDurExtend = 0.00, benRngExtend = 1.00, detDurExtend = 0.00, detRngExtend = 1.00, reinforcement = 0.00;
@@ -312,7 +313,7 @@ PCHAR DefaultUseOnce[] = { "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0","0","0", NULL };// 10 per line
 
-// special declares
+											// special declares
 OPTIONS	spellTypeInt;
 _BotSpells EndRegenSpell;
 #pragma endregion VariableDefinitions
@@ -1031,9 +1032,22 @@ void CheckMemmedSpells()
 									pCharData1->GetFocusCastingTimeModifier((EQ_Spell*)vMemmedSpells[nGem].Spell, (EQ_Equipment**)&n, 0) +
 									vMemmedSpells[nGem].Spell->CastTime;
 							}
-							vMaster.push_back(vMemmedSpells[nGem]);
 							change = true;
-							WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s", vMemmedSpells[nGem].SpellName);
+							if(vMemmedSpells[nGem].SpellTypeOption!=::OPTIONS::ZERO)
+								WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
+							else
+								WriteChatf("\arMQ2Bot\aw::\ayDetected: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
+							for (int i = 0; i < vMaster.size(); i++)
+							{
+								if (vMaster[i].Spell == vMemmedSpells[nGem].Spell)
+								{
+									WriteChatf("\arMQ2Bot\aw::\amKnown: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
+									vMaster[i] = vMemmedSpells[nGem];
+									return;
+								}
+							}
+							if (vMemmedSpells[nGem].SpellTypeOption != ::OPTIONS::ZERO)
+								vMaster.push_back(vMemmedSpells[nGem]);
 						}
 					}
 				}
@@ -1060,9 +1074,9 @@ void CheckMemmedSpells()
 		if (change)
 			SortSpellVector(vMaster);
 	}
-	catch(...)
+	catch (...)
 	{
-		
+
 	}
 }
 
@@ -1307,7 +1321,7 @@ bool sortByPriority(const BotSpells &lhs, const BotSpells &rhs) { return lhs.Pri
 void SortSpellVector(vector<_BotSpells> v)  // the actual sorting of a spell vector by priority
 {
 	sort(v.begin(), v.end(), sortByPriority);
-} 
+}
 
 void SpellCategory(PSPELL pSpell)
 {
@@ -1748,7 +1762,7 @@ void CreateDisc()
 		{
 			::sprintf(szSpellGem, "Spell%dGem", i);
 			GetPrivateProfileString(INISection, szSpellGem, NULL, szTempGem, MAX_STRING, INIFileName);
-			if (stristr(szTempGem,"disc"))
+			if (stristr(szTempGem, "disc"))
 			{
 				for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
 				{
@@ -1944,10 +1958,10 @@ void CheckMaster()
 {
 	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
 	CheckMemmedSpells();
-	for (int i = 0; i < vMaster.size();i++)
+	for (int i = 0; i < vMaster.size(); i++)
 	{
-			if (vMaster[i].CheckFunc != NULL)
-				vMaster[i].CheckFunc(i);
+		if (vMaster[i].CheckFunc != NULL)
+			vMaster[i].CheckFunc(i);
 	}
 }
 void CheckAA(int spell)
@@ -1956,7 +1970,7 @@ void CheckAA(int spell)
 		return;
 	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
 	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
-	if(vMaster[spell].Spell->SpellType==0)
+	if (vMaster[spell].Spell->SpellType == 0)
 		if (!ShouldICastDetrimental(vMaster[spell]))
 			return;
 	if (vMaster[spell].Spell->SpellType != 0)
@@ -2478,14 +2492,14 @@ VOID AddSpell(int TargetID, int SpellID, int TickE)
 		case  3: // Group v1
 		case  6: // Self
 		case 41: // Group v2
-			AddSpellTimer(GetCharInfo()->pSpawn->SpawnID, pSpell, TickE,false);
+			AddSpellTimer(GetCharInfo()->pSpawn->SpawnID, pSpell, TickE, false);
 			break;
 		case 14: // Pet
-			AddSpellTimer(GetCharInfo()->pSpawn->PetID, pSpell, TickE,false);
+			AddSpellTimer(GetCharInfo()->pSpawn->PetID, pSpell, TickE, false);
 			break;
 		case  5: // Single
 		case  8: // Targeted AE
-			AddSpellTimer(TargetID, pSpell, TickE,false);
+			AddSpellTimer(TargetID, pSpell, TickE, false);
 			break;
 		default: break; // Unknown
 		}
@@ -2798,7 +2812,7 @@ void CastHandle(_BotSpells &spell) {
 		else {
 			char castN[MAX_STRING];
 			::sprintf(castN, "\"%s\"", spell.SpellName);
-			if (CastK == TYPE_SPELL)     Cast(GetCharInfo()->pSpawn,castN);
+			if (CastK == TYPE_SPELL)     Cast(GetCharInfo()->pSpawn, castN);
 			else if (CastK == TYPE_AA)  Execute("/alt activate %d", spell.ID);
 			else if (CastK == TYPE_ITEM) Execute("/multiline ; /stopsong ; /useitem \"%s\"", CastN);
 		}
@@ -2838,37 +2852,38 @@ void BotCastCommand(_BotSpells &spell) {
 	else if (Invisible && GetCharInfo()->pSpawn->HideMode) Resultat = CAST_INVISIBLE;
 	//else if (!SpellFind(CastN, CastC))                      Resultat = CAST_UNKNOWN;
 	//else if (fTYPE != TYPE_SPELL && !SpellReady(spell.ID)) Resultat = CAST_NOTREADY;
-	if (spell.Spell->TargetType !=14 && spell.Spell->TargetType != 6 && spell.Spell->TargetType != 3 && spell.Spell->TargetType != 41) //&& spell.Spell->TargetType != 45
+	if (spell.Spell->TargetType != 14 && spell.Spell->TargetType != 6 && spell.Spell->TargetType != 3 && spell.Spell->TargetType != 41) //&& spell.Spell->TargetType != 45
 		if (PSPAWNINFO Target = (PSPAWNINFO)GetSpawnByID(TargI)) *(PSPAWNINFO*)ppTarget = Target;
-			else Resultat = CAST_NOTARGET;
-	if (Resultat == CAST_SUCCESS && spell.Type == TYPE_SPELL) {
-		if (BardClass) {
-			if (GetCharInfo()->pSpawn->CastingData.SpellID) EzCommand("/stopsong");
-		}
-		CastG = GEMID(spell.ID);
-		if (CastG == NOID) {
-			CastG = atoi(&spell.Gem[(strnicmp(spell.Gem, "gem", 3)) ? 0 : 3]) - 1;
-			MemoLoad(CastG, spell.Spell);
-			SpellTotal = 1;
-			MemoF = FLAG_REQUEST;
-			MemoE = DONE_SUCCESS;
-		}
+		else Resultat = CAST_NOTARGET;
+		if (Resultat == CAST_SUCCESS && spell.Type == TYPE_SPELL) {
+			if (BardClass) {
+				if (GetCharInfo()->pSpawn->CastingData.SpellID) EzCommand("/stopsong");
+			}
+			CastG = GEMID(spell.ID);
+			if (CastG == NOID) {
+				CastG = atoi(&spell.Gem[(strnicmp(spell.Gem, "gem", 3)) ? 0 : 3]) - 1;
+				MemoLoad(CastG, spell.Spell);
+				SpellTotal = 1;
+				MemoF = FLAG_REQUEST;
+				MemoE = DONE_SUCCESS;
+			}
 
-	}
-	if (Resultat != CAST_SUCCESS) {
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)]", MQGetTickCount64(), cast_status[Resultat], Resultat);
-		return;
-	}
-	CastF = FLAG_REQUEST;
-	CastI = spell.Spell;
-	CastK = spell.Type;
-	CastT = spell.CastTime;
-	CastS = spell.Spell;
-	CastM = MQGetTickCount64() + DELAY_CAST;
-	strcpy(CastN, spell.SpellName);
-	DebugWrite("[%llu] MQ2Bot:[Casting]: Name<%s> Type<%d>.", MQGetTickCount64(), CastN, CastK);
-	CastHandle(spell);
+		}
+		if (Resultat != CAST_SUCCESS) {
+			DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)]", MQGetTickCount64(), cast_status[Resultat], Resultat);
+			return;
+		}
+		CastF = FLAG_REQUEST;
+		CastI = spell.Spell;
+		CastK = spell.Type;
+		CastT = spell.CastTime;
+		CastS = spell.Spell;
+		CastM = MQGetTickCount64() + DELAY_CAST;
+		strcpy(CastN, spell.SpellName);
+		DebugWrite("[%llu] MQ2Bot:[Casting]: Name<%s> Type<%d>.", MQGetTickCount64(), CastN, CastK);
+		CastHandle(spell);
 }
 // NEW end functions
 
 #pragma endregion MQ2CastCode
+#pragma warning ( pop )
