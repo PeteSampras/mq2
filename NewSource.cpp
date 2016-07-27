@@ -1,8 +1,30 @@
+/* notes:
+
+_SPAWNS KillTarget; // we always store the current kill target here
+vector<_Spawns> vGroup, vXTarget, vAdds; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
+// to use discs: pCharData->DoCombatAbility(vMaster[i].ID);
+try 
+{
+	if(pSpawn) 
+	{
+		SPAWNINFO tSpawn;
+		memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
+		RemoveFromNotify(&tSpawn, true);
+	}
+} 
+catch(...)
+{
+	DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
+}
+
+*/
+
 #pragma region Headers
 // Comment out MMOBUGS_LOADER to not use MMOBugs specific code
 #define MMOBUGS_LOADER
 // Can safely ignore these warnings
-#pragma warning ( disable : 4710 4365 4018 4244 4505 4189 4101 4100 4482 )
+//#pragma warning ( disable : 4710 4365 4018 4244 4505 4189 4101 4100 4482 )
+#pragma warning ( disable : 4482 )
 // includes
 #include "../MQ2Plugin.h"
 #include "../moveitem2.h"
@@ -91,6 +113,7 @@ enum SKILLTYPES { TYPE_SPELL = 1, TYPE_AA = 2, TYPE_ITEM = 3, TYPE_DISC = 4 }; /
 
 
 // structs
+struct _BotSpells;
 
 typedef struct _BotSpells // has to be before the FunctionDeclarations because a bunch use it
 {
@@ -122,8 +145,55 @@ typedef struct _BotSpells // has to be before the FunctionDeclarations because a
 	int					CastTime;				// Casting time
 	DWORD				TargetID;				// Id of target i want to cast on
 	int					IniMatch;				// what spell number is this in the ini, if any.
-	void				*CheckFunc;
+	// save this just in case:  void(*CheckFunc)(std::vector<_BotSpells> &, int);
+	void(*CheckFunc)(int);
 } BotSpells, *PBotSpells;
+
+typedef struct _Spawns
+{
+	vector<_BotSpells>	vSpellList;
+	char				SpawnBuffList[MAX_STRING];
+	int					ID;
+	PSPAWNINFO			Spawn;
+	bool				NeedsCheck;
+	ULONGLONG			LastChecked;
+	ULONGLONG			Slow;  //mq2 time stamp of when slow should last until, repeat et al for rest
+	ULONGLONG			Malo;
+	ULONGLONG			Tash;
+	ULONGLONG			Haste;
+	ULONGLONG			Root;
+	ULONGLONG			Snare;
+	ULONGLONG			Mez;
+	ULONGLONG			DS;
+	ULONGLONG			RevDS;
+	ULONGLONG			Cripple;
+	ULONGLONG			Charge;
+	ULONGLONG			Concuss;
+	ULONGLONG			MindFroze;
+	ULONGLONG			Charm;
+	ULONGLONG			Aego;
+	ULONGLONG			Skin;
+	ULONGLONG			Focus;
+	ULONGLONG			Regen;
+	ULONGLONG			Symbol;
+	ULONGLONG			Clarity;
+	ULONGLONG			Pred;
+	ULONGLONG			Strength;
+	ULONGLONG			Brells;
+	ULONGLONG			SV;
+	ULONGLONG			SE;
+	ULONGLONG			HybridHP;
+	ULONGLONG			Growth;
+	ULONGLONG			Shining;
+	ULONGLONG			DeepSleep;
+	int					PoisonCounters;
+	int					DiseaseCounters;
+	int					CorruptedCounters;
+	int					CurseCounters;
+	int					DetrimentalCounters;
+	ULONGLONG			Hot;
+	ULONGLONG			Fero;
+} Spawns, *PSpawns, SpawnCopy;
 
 #pragma region FunctionDeclarations
 // declaration of create functions
@@ -133,10 +203,10 @@ void CreateDisc();
 void CreateHeal();
 
 // declaration of check routines
-void CheckAA(vector<_BotSpells> * v, int * spell);
-void CheckAggro(vector<_BotSpells> * v, int * spell);
-void CheckDisc(vector<_BotSpells> * v, int * spell);
-void CheckHeal(vector<_BotSpells> * v, int * spell);
+void CheckAA(int spell);
+void CheckAggro(int spell);
+void CheckDisc(int spell);
+void CheckHeal(int spell);
 
 // declaration of general functions
 int			CalcDuration(PSPELL pSpell);
@@ -162,18 +232,9 @@ bool		ValidDet(PSPELL pSpell, PSPAWNINFO Target);
 bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 #pragma endregion FunctionDeclarations
 
-// function struct -- has to be after the FunctionDeclarations because it uses them
-typedef void(*CheckFunction)(vector<_BotSpells>*, int*);
-struct CheckFunc
-{
-	CheckFunction CheckAA;
-	CheckFunction CheckDisc;
-	CheckFunction CheckHeal;
-};
-
 #pragma region VariableDefinitions
 // bool declares
-bool  BardClass = false, DEBUG_DUMPFILE = false;
+bool  BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded=false;
 
 // char declares
 char BodyTypeFix[MAX_STRING] = { 0 },CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 }, INISection[MAX_STRING] = { 0 }, spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 };
@@ -188,7 +249,7 @@ float benDurExtend = 0.00, benRngExtend = 1.00, detDurExtend = 0.00, detRngExten
 ULONGLONG LastAnnouncedSpell = 0, SpellTimer = 0;
 
 //vector _BotSpell declares
-vector<_BotSpells> vMaster, vMemmedSpells, vTemp, vDisc;
+vector<_BotSpells> vMaster, vMemmedSpells, vTemp;
 
 //vector int declares
 vector<int> vClickyPrestige;
@@ -222,7 +283,7 @@ PCHAR DefaultColor[] = { "\ap", "\a-r","\a-m","\a-t","\aw","\ao","\am","\a-o","\
 "\a-o","\ay","\ay","\ag","\a-w","\am","\a-g","\at","\a-t","\a-t",
 "\ay","\at","\a-g","\ag","\ag","\ao","\ar","\a-t","\a-t","\a-o",
 "\a-g","\aw","\a-g","\a-o","\a-r", "\a-y","\ag","\a-m", NULL };// 10 per line
-PCHAR DefaultPriority[] = { "0","90", "0", "0", "0", "0", "0", "0", "0", "0",
+PCHAR DefaultPriority[] = { "30","90", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","80", "70", "0", "95", "0", "0", "99", "85", "0",
 "98","100", "0", "91", "0", "0", "45", "0", "0", "0",
 "50","0", "75", "0", "72","0","0", "100", NULL };// 10 per line
@@ -886,109 +947,123 @@ void CheckMemmedSpells()
 	if (!InGameOK())
 		return;
 	bool change = false;
-	for (unsigned long nGem = 0; nGem < NUM_SPELL_GEMS; nGem++)
+	try
 	{
-		if (PSPELL pSpell = GetSpellByID(GetMemorizedSpell(nGem)))
+		if (pDisplay && pLocalPlayer)
 		{
-			if (pSpell->ID != vMemmedSpells[nGem].ID)
+			for (unsigned long nGem = 0; nGem < NUM_SPELL_GEMS; nGem++)
 			{
-				char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING], spellNum[10], color[10] = { 0 };
-				//_BotSpells spell;
-				vMemmedSpells[nGem].Spell = pSpell;
-				vMemmedSpells[nGem].PreviousID = vMemmedSpells[nGem].ID;
-				::strcpy(vMemmedSpells[nGem].SpellName, pSpell->Name);
-				vMemmedSpells[nGem].ID = pSpell->ID;
-				::strcpy(vMemmedSpells[nGem].Gem, itoa(nGem, szTemp, 10));
-				SpellType(pSpell);
-				::strcpy(vMemmedSpells[nGem].SpellCat, spellType);
-				int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0;
-				for (int x = 0; DefaultSection[x]; x++)
+				if (GetMemorizedSpell(nGem) != 0xFFFFFFFF)
 				{
-					if (!stricmp(spellType, DefaultSection[x]))
+					if (PSPELL pSpell = GetSpellByID(GetMemorizedSpell(nGem)))
 					{
-						::strcpy(color, DefaultColor[x]);
-						defStartAt = atoi(DefaultStartAt[x]);
-						defUse = atoi(DefaultUse[x]);
-						defStopAt = atoi(DefaultStopAt[x]);
-						defPriority = atoi(DefaultPriority[x]);
-						// WriteChatf("%s - %d", spellType, defPriority);
-						defNamedOnly = atoi(DefaultNamedOnly[x]);
-						defUseOnce = atoi(DefaultUseOnce[x]);
-						defForceCast = atoi(DefaultForceCast[x]);
-						break;
+						if (pSpell->ID != vMemmedSpells[nGem].ID)
+						{
+							char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING], spellNum[10], color[10] = { 0 };
+							//_BotSpells spell;
+							vMemmedSpells[nGem].Spell = pSpell;
+							vMemmedSpells[nGem].PreviousID = vMemmedSpells[nGem].ID;
+							::strcpy(vMemmedSpells[nGem].SpellName, pSpell->Name);
+							vMemmedSpells[nGem].ID = pSpell->ID;
+							::strcpy(vMemmedSpells[nGem].Gem, itoa(nGem, szTemp, 10));
+							SpellType(pSpell);
+							vMemmedSpells[nGem].CheckFunc = NULL; // temp code this needs replaced once i dont crash
+							::strcpy(vMemmedSpells[nGem].SpellCat, spellType);
+							int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0;
+							for (int x = 0; DefaultSection[x]; x++)
+							{
+								if (!stricmp(spellType, DefaultSection[x]))
+								{
+									::strcpy(color, DefaultColor[x]);
+									defStartAt = atoi(DefaultStartAt[x]);
+									defUse = atoi(DefaultUse[x]);
+									defStopAt = atoi(DefaultStopAt[x]);
+									defPriority = atoi(DefaultPriority[x]);
+									// WriteChatf("%s - %d", spellType, defPriority);
+									defNamedOnly = atoi(DefaultNamedOnly[x]);
+									defUseOnce = atoi(DefaultUseOnce[x]);
+									defForceCast = atoi(DefaultForceCast[x]);
+									break;
+								}
+							}
+							int i = nGem + 1;
+							int customSpells = GetPrivateProfileInt(INISection, "SpellTotal", 0, INIFileName);
+							for (int x = 0; x < customSpells; x++)
+							{
+								::sprintf(szSpell, "Spell%dName", x);
+								if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
+								{
+									if (!stricmp(szSpell, pSpell->Name))
+										::sprintf(spellNum, "Spell%d", x);
+								}
+							}
+							::sprintf(szSpell, "%sIf", spellNum);
+							if (GetPrivateProfileString(INISection, szSpell, "1", szTemp, MAX_STRING, INIFileName))
+								::strcpy(vMemmedSpells[nGem].If, szTemp);
+							::sprintf(szSpell, "%sGem", spellNum);
+							if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
+								::strcpy(vMemmedSpells[nGem].Gem, szTemp);
+							::sprintf(szSpell, "%sUseOnce", spellNum);
+							vMemmedSpells[nGem].UseOnce = GetPrivateProfileInt(INISection, szSpell, defUseOnce, INIFileName);
+							::sprintf(szSpell, "%sForceCast", spellNum);
+							vMemmedSpells[nGem].ForceCast = GetPrivateProfileInt(INISection, szSpell, defForceCast, INIFileName);
+							::sprintf(szSpell, "%sUse", spellNum);
+							vMemmedSpells[nGem].Use = GetPrivateProfileInt(INISection, szSpell, defUse, INIFileName);
+							::sprintf(szSpell, "%sStartAt", spellNum);
+							vMemmedSpells[nGem].StartAt = GetPrivateProfileInt(INISection, szSpell, defStartAt, INIFileName);
+							::sprintf(szSpell, "%sStopAt", spellNum);
+							vMemmedSpells[nGem].StopAt = GetPrivateProfileInt(INISection, szSpell, defStopAt, INIFileName);
+							::sprintf(szSpell, "%sNamedOnly", spellNum);
+							vMemmedSpells[nGem].NamedOnly = GetPrivateProfileInt(INISection, szSpell, defNamedOnly, INIFileName);
+							::sprintf(szSpell, "%sPriority", spellNum);
+							vMemmedSpells[nGem].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
+							vMemmedSpells[nGem].LastTargetID = 0;
+							vMemmedSpells[nGem].LastCast = 0;
+							vMemmedSpells[nGem].Recast = 0;
+							vMemmedSpells[nGem].TargetID = 0;
+							::sprintf(szSpell, "%sDuration", spellNum);
+							vMemmedSpells[nGem].Duration = !GetSpellDuration2(vMemmedSpells[nGem].Spell) ? 0 : 6000 * GetSpellDuration2(vMemmedSpells[nGem].Spell) * (ULONGLONG)CalcDuration(vMemmedSpells[nGem].Spell);
+							::strcpy(vMemmedSpells[nGem].Color, color);
+							DWORD n = 0;
+							if (vMemmedSpells[nGem].Type == TYPE_SPELL)
+							{
+								vMemmedSpells[nGem].CastTime = pCharData1->GetAACastingTimeModifier((EQ_Spell*)vMemmedSpells[nGem].Spell) +
+									pCharData1->GetFocusCastingTimeModifier((EQ_Spell*)vMemmedSpells[nGem].Spell, (EQ_Equipment**)&n, 0) +
+									vMemmedSpells[nGem].Spell->CastTime;
+							}
+							vMaster.push_back(vMemmedSpells[nGem]);
+							change = true;
+							WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s", vMemmedSpells[nGem].SpellName);
+						}
 					}
 				}
-				int i = nGem + 1;
-				int customSpells = GetPrivateProfileInt(INISection, "SpellTotal", 0, INIFileName);
-				for (int x = 0; x < customSpells; x++)
+				else
 				{
-					::sprintf(szSpell, "Spell%dName", x);
-					if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
+					if (vMemmedSpells[nGem].ID)
 					{
-						if (!stricmp(szSpell, pSpell->Name))
-							::sprintf(spellNum, "Spell%d", x);
+						for (int i = 0; i < vMaster.size(); i++)
+						{
+							if (vMaster[i].ID == vMemmedSpells[nGem].ID)
+							{
+								WriteChatf("\arMQ2Bot\aw::\aoRemoved: \aw(%s)", vMemmedSpells[nGem].SpellName);
+								vMaster.erase(vMaster.begin() + i);
+								BotSpells spell;
+								vMemmedSpells[nGem] = spell;
+								vMemmedSpells[nGem].ID = 0;
+								break;
+							}
+						}
 					}
 				}
-				::sprintf(szSpell, "%sIf", spellNum);
-				if (GetPrivateProfileString(INISection, szSpell, "1", szTemp, MAX_STRING, INIFileName))
-					::strcpy(vMemmedSpells[nGem].If, szTemp);
-				::sprintf(szSpell, "%sGem", spellNum);
-				if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
-					::strcpy(vMemmedSpells[nGem].Gem, szTemp);
-				::sprintf(szSpell, "%sUseOnce", spellNum);
-				vMemmedSpells[nGem].UseOnce = GetPrivateProfileInt(INISection, szSpell, defUseOnce, INIFileName);
-				::sprintf(szSpell, "%sForceCast", spellNum);
-				vMemmedSpells[nGem].ForceCast = GetPrivateProfileInt(INISection, szSpell, defForceCast, INIFileName);
-				::sprintf(szSpell, "%sUse", spellNum);
-				vMemmedSpells[nGem].Use = GetPrivateProfileInt(INISection, szSpell, defUse, INIFileName);
-				::sprintf(szSpell, "%sStartAt", spellNum);
-				vMemmedSpells[nGem].StartAt = GetPrivateProfileInt(INISection, szSpell, defStartAt, INIFileName);
-				::sprintf(szSpell, "%sStopAt", spellNum);
-				vMemmedSpells[nGem].StopAt = GetPrivateProfileInt(INISection, szSpell, defStopAt, INIFileName);
-				::sprintf(szSpell, "%sNamedOnly", spellNum);
-				vMemmedSpells[nGem].NamedOnly = GetPrivateProfileInt(INISection, szSpell, defNamedOnly, INIFileName);
-				::sprintf(szSpell, "%sPriority", spellNum);
-				vMemmedSpells[nGem].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
-				vMemmedSpells[nGem].LastTargetID = 0;
-				vMemmedSpells[nGem].LastCast = 0;
-				vMemmedSpells[nGem].Recast = 0;
-				vMemmedSpells[nGem].TargetID = 0;
-				::sprintf(szSpell, "%sDuration", spellNum);
-				vMemmedSpells[nGem].Duration = !GetSpellDuration2(vMemmedSpells[nGem].Spell) ? 0 : 6000 * GetSpellDuration2(vMemmedSpells[nGem].Spell) * (ULONGLONG)CalcDuration(vMemmedSpells[nGem].Spell);
-				::strcpy(vMemmedSpells[nGem].Color, color);
-				DWORD n = 0;
-				if (vMemmedSpells[nGem].Type == TYPE_SPELL)
-				{
-					vMemmedSpells[nGem].CastTime = pCharData1->GetAACastingTimeModifier((EQ_Spell*)vMemmedSpells[nGem].Spell) +
-						pCharData1->GetFocusCastingTimeModifier((EQ_Spell*)vMemmedSpells[nGem].Spell, (EQ_Equipment**)&n, 0) +
-						vMemmedSpells[nGem].Spell->CastTime;
-				}
-				vMaster.push_back(vMemmedSpells[nGem]);
-				change = true;
-				WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s", vMemmedSpells[nGem].SpellName);
 			}
 		}
-		else
-		{
-			if (vMemmedSpells[nGem].ID)
-			{
-				for (int i = 0; i < vMaster.size(); i++)
-				{
-					if (vMaster[i].ID == vMemmedSpells[nGem].ID)
-					{
-						vMaster.erase(vMaster.begin() + i);
-						break;
-					}
-				}
-				WriteChatf("\arMQ2Bot\aw::\aRemoved: \aw(%s) \aoremoved.", vMemmedSpells[nGem].SpellName);
-				BotSpells spell;
-				vMemmedSpells[nGem] = spell;
-				vMemmedSpells[nGem].ID = 0;
-			}
-		}
+		if (change)
+			SortSpellVector(vMaster);
 	}
-	if (change)
-		SortSpellVector(vMaster);
+	catch(...)
+	{
+		
+	}
 }
 
 void DiscCategory(PSPELL pSpell)
@@ -1229,18 +1304,10 @@ bool ShouldICastDetrimental(_BotSpells &spell)
 
 bool sortByPriority(const BotSpells &lhs, const BotSpells &rhs) { return lhs.Priority > rhs.Priority; } // Sort spell vectors by priority
 
-void SortSpellVector(vector<_BotSpells> v)
+void SortSpellVector(vector<_BotSpells> v)  // the actual sorting of a spell vector by priority
 {
-	/*for (int i = 0; i < v.size(); i++)
-	{
-		WriteChatf("Original order %d: %s | Priority: %d", i, v[i].SpellName, v[i].Priority);
-	}*/
 	sort(v.begin(), v.end(), sortByPriority);
-	//for (int i = 0; i < v.size(); i++)
-	//{
-	//	WriteChatf("New order %d: %s | Priority: %d", i, v[i].SpellName, v[i].Priority);
-	//}
-}
+} 
 
 void SpellCategory(PSPELL pSpell)
 {
@@ -1608,6 +1675,7 @@ void CreateAA()
 					::strcpy(spell.SpellName, szTemp);
 					spell.CanIReprioritize = 0;
 					spell.ID = aa->ID;
+					spell.SpellTypeOption = ::OPTIONS::AA;
 					spell.CheckFunc = CheckAA;
 					::strcpy(spell.Gem, "alt");
 					vTemp.push_back(spell);
@@ -1639,6 +1707,7 @@ void CreateAA()
 					spell.CanIReprioritize = 1;
 					spell.Type = TYPE_AA;
 					spell.ID = aa->ID;
+					spell.SpellTypeOption = ::OPTIONS::AA;
 					spell.CheckFunc = CheckAA;
 					::strcpy(spell.Gem, "alt");
 					vTemp.push_back(spell);
@@ -1657,7 +1726,7 @@ void CreateDisc()
 {
 	if (!InGameOK())
 		return;
-	vDisc.clear();
+	vTemp.clear();
 	// discs are special due to timer ID and how this detects, I really dont want to screw with how they are ordered, even in a custom ini scenario.
 	vector<PSPELL> tempSpell;
 	vector<int> tempLevel;
@@ -1669,6 +1738,31 @@ void CreateDisc()
 		tempLevel.push_back(0);
 		tempTimer.push_back(i);
 		noOverwrite.push_back(0);
+	}
+	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING] = { 0 }, szSpellGem[MAX_STRING] = { 0 }, szTempGem[MAX_STRING] = { 0 };
+	int customSpells = GetPrivateProfileInt(INISection, "SpellTotal", 0, INIFileName);
+	for (int i = 0; i < customSpells; i++)
+	{
+		::sprintf(szSpell, "Spell%dName", i);
+		if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
+		{
+			::sprintf(szSpellGem, "Spell%dGem", i);
+			GetPrivateProfileString(INISection, szSpellGem, NULL, szTempGem, MAX_STRING, INIFileName);
+			if (stristr(szTempGem,"disc"))
+			{
+				for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
+				{
+					if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(nCombatAbility)) {
+						if (PSPELL pSpell = GetSpellByID(pPCData->GetCombatAbility(nCombatAbility)))
+						{
+							tempSpell[pSpell->CARecastTimerID] = pSpell;
+							tempLevel[pSpell->CARecastTimerID] = pSpell->ClassLevel[GetCharInfo()->pSpawn->Class];
+							noOverwrite[pSpell->CARecastTimerID] = 1;
+						}
+					}
+				}
+			}
+		}
 	}
 	for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
 	{
@@ -1697,7 +1791,7 @@ void CreateDisc()
 	}
 	// ------------------finalize discs------------------------------
 	// first check for if statement for section
-	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING] = { 0 };
+
 	::sprintf(szSpell, "DiscIf");
 	if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
 	{
@@ -1716,22 +1810,27 @@ void CreateDisc()
 			::strcpy(disc.SpellName, tempSpell[i]->Name);
 			disc.Type = TYPE_DISC;
 			disc.CheckFunc = CheckDisc;
+			disc.SpellTypeOption = ::OPTIONS::DISC;
 			disc.ID = tempSpell[i]->ID;
 			::strcpy(disc.Gem, "disc");
-			vDisc.push_back(disc);
+			vTemp.push_back(disc);
 		}
 
 	}
 	// load the rest of the disc info
-	LoadBotSpell(vDisc, "Disc");
+	LoadBotSpell(vTemp, "Disc");
 	// find the endurance regen disc
-	for (int i = 0; i < vDisc.size(); i++)
+	for (int i = 0; i < vTemp.size(); i++)
 	{
-		if (strstr(vDisc[i].SpellCat, "End Regen") && !strstr(vDisc[i].SpellName, "Wind"))
+		if (strstr(vTemp[i].SpellCat, "End Regen") && !strstr(vTemp[i].SpellName, "Wind"))
 		{
-			EndRegenSpell = vDisc[i];
-			WriteChatf("Endurance Regen Disc: %s", vDisc[i].SpellName);
+			EndRegenSpell = vTemp[i];
+			WriteChatf("Endurance Regen Disc: %s", vTemp[i].SpellName);
 		}
+	}
+	for (int i = 0; i < vTemp.size(); i++)
+	{
+		vMaster.push_back(vTemp[i]);
 	}
 }
 void CreateHeal()
@@ -1767,6 +1866,7 @@ void CreateHeal()
 					spell.CanIReprioritize = 0;
 					spell.Type = TYPE_AA;
 					spell.CheckFunc = CheckHeal;
+					spell.SpellTypeOption = ::OPTIONS::HEAL;
 					spell.ID = aa->ID;
 					::sprintf(gem, "alt");
 					::strcpy(spell.Gem, gem);
@@ -1787,6 +1887,7 @@ void CreateHeal()
 							spell.CanIReprioritize = 0;
 							spell.ID = pSpell->ID;
 							spell.CheckFunc = CheckHeal;
+							spell.SpellTypeOption = ::OPTIONS::HEAL;
 							spell.Type = TYPE_SPELL;
 							::sprintf(gem, "%d", DefaultGem);
 							::strcpy(spell.Gem, gem);
@@ -1822,6 +1923,7 @@ void CreateHeal()
 					spell.CanIReprioritize = 1;
 					::sprintf(gem, "alt");
 					spell.CheckFunc = CheckHeal;
+					spell.SpellTypeOption = ::OPTIONS::HEAL;
 					::strcpy(spell.Gem, gem);
 					vTemp.push_back(spell);
 				}
@@ -1840,31 +1942,31 @@ void CreateHeal()
 // master check
 void CheckMaster()
 {
+	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+	CheckMemmedSpells();
 	for (int i = 0; i < vMaster.size();i++)
 	{
-		vMaster[i].CheckFunc;
+			if (vMaster[i].CheckFunc != NULL)
+				vMaster[i].CheckFunc(i);
 	}
 }
-void CheckAA(vector<_BotSpells> * v, int * spell)
+void CheckAA(int spell)
 {
 	if (!InGameOK())
 		return;
-	if((*v)[*spell].Spell->SpellType==0)
-		if (!ShouldICastDetrimental((*v)[*spell]))
-			return;
-	if ((*v)[*spell].Spell->SpellType != 0)
-		if (SpellStacks((*v)[*spell].Spell) || GetCharInfo()->pSpawn->Class == 16 && strcmp((*v)[*spell].SpellName, "Savage Spirit"))
-			return;
-	// (*v)[*spell].Spell;// test code
 	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
-	DebugWrite("Checking %s: Spell: %s", CurrentRoutine, (*v)[*spell].SpellName); // test code
-	//DebugWrite("%s: Checking routine", CurrentRoutine);
-
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	if(vMaster[spell].Spell->SpellType==0)
+		if (!ShouldICastDetrimental(vMaster[spell]))
+			return;
+	if (vMaster[spell].Spell->SpellType != 0)
+		if (SpellStacks(vMaster[spell].Spell) || GetCharInfo()->pSpawn->Class == 16 && strcmp(vMaster[spell].SpellName, "Savage Spirit"))
+			return;
 	// all the basic checks have cleared, now we need to test the one-offs
 
 	// this check will need readded for AACutOffTime
 	// if (valid && (atol(sTest) <= (AACutoffTime * 60) || named && GetSpawnByID((DWORD)atol(sNamed))))  
-	if (GetCharInfo()->pSpawn->Class == 16 && (!strcmp((*v)[*spell].SpellName, "Savage Spirit") || !strcmp((*v)[*spell].SpellName, "Untamed Rage")))
+	if (GetCharInfo()->pSpawn->Class == 16 && (!strcmp(vMaster[spell].SpellName, "Savage Spirit") || !strcmp(vMaster[spell].SpellName, "Untamed Rage")))
 	{
 		char sstest[MAX_STRING] = "";
 		::sprintf(sstest, "${If[${Me.ActiveDisc.ID},1,0]}");
@@ -1872,17 +1974,19 @@ void CheckAA(vector<_BotSpells> * v, int * spell)
 		if (atoi(sstest) == 1)
 			return;
 	}
-	BotCastCommand((*v)[*spell]);
+	BotCastCommand(vMaster[spell]);
 }
-void CheckAggro(vector<_BotSpells> * v, int * spell)
+void CheckAggro(int spell)
 {
 	return;
 }
-void CheckDisc(vector<_BotSpells> * v, int * spell)
+void CheckDisc(int spell)
 {
+	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
 	return;
 }
-void CheckHeal(vector<_BotSpells> * v, int * spell)
+void CheckHeal(int spell)
 {
 	return;
 }
@@ -1894,6 +1998,7 @@ void Configure(char szCustomIni[MAX_STRING], int force)
 	if (!InGameOK())
 		return;
 	int i;
+	vMaster.clear();
 	vMemmedSpells.clear();
 	if (vMemmedSpells.size()<12)
 	{
@@ -1934,11 +2039,12 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	DebugWrite("BotCommand");
 	DurationSetup();
 	CreateAA();
-	//CreateDisc();
+	CreateDisc();
 	//CreateHeal();
 
-	//CheckMemmedSpells();
+	CheckMemmedSpells();
 	SortSpellVector(vMemmedSpells);
+	ConfigureLoaded = true;
 }
 void MemmedCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
@@ -2057,54 +2163,17 @@ PLUGIN_API VOID OnPulse(VOID)
 {
 	if (!InGameOK())
 		return;
+
+	if (!ConfigureLoaded)
+		return;
 	CheckMaster();
 }
 
 #pragma endregion Loading
 
 #pragma region UnusedCode
-/* save
 
-int main() {
-	OPTIONS option;
-	MyFunctions checkFunc;
-	for (int i = 0; i < 1;i++)
-	{
-		check(vMaster[i].SpellTypeOption, &checkFunc, &vMaster, &i);
-	}
 
-}
-#pragma region Classes
-class MyFunctions {
-public:
-void Aa(vector<_BotSpells> * v, int * spell) {
-CheckAA(v, spell);
-}
-void Aggro(vector<_BotSpells> * v, int * spell) {
-CheckAggro(v, spell);
-}
-};
-
-typedef void(MyFunctions::*PTR) (vector<_BotSpells>*, int*);//pointer-to-member function
-void check(int option, MyFunctions* checkFunc, vector<_BotSpells>* v, int* spell) {
-PTR pmf[2] = { &MyFunctions::Aa, &MyFunctions::Aggro }; //pointer array
-switch (option) {
-case AA:
-(checkFunc->*pmf[AA])(v, spell);
-break;
-case AGGRO:
-(checkFunc->*pmf[AGGRO])(v, spell);
-break;
-}
-}
-#pragma endregion Classes
-void CheckSpells()
-{
-int i = 1;
-CheckFunc myfunc;
-myfunc.CheckAA(&vMaster, &i);
-}
-*/
 #pragma endregion UnusedCode
 
 #pragma region MQ2CastCode
