@@ -226,7 +226,7 @@ void		DiscCategory(PSPELL pSpell);
 DWORD		GetSpellDuration2(PSPELL pSpell);
 void		LoadBotSpell(vector<_BotSpells> &v, char VectorName[MAX_STRING]);
 void		PopulateIni(vector<_BotSpells> &v, char VectorName[MAX_STRING]);
-void		SortSpellVector(vector<_BotSpells> v);
+void		SortSpellVector(vector<_BotSpells> &v);
 void		SpellCategory(PSPELL pSpell);
 void		SpellType(PSPELL pSpell);
 bool		ValidDet(PSPELL pSpell, PSPAWNINFO Target);
@@ -287,7 +287,7 @@ PCHAR DefaultColor[] = { "\ap", "\a-r","\a-m","\a-t","\aw","\ao","\am","\a-o","\
 PCHAR DefaultPriority[] = { "30","90", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","80", "70", "0", "95", "0", "0", "99", "85", "0",
 "98","100", "0", "91", "0", "0", "45", "0", "0", "0",
-"50","0", "75", "0", "72","0","0", "100", NULL };// 10 per line
+"50","0", "75", "0", "72","60","0", "100", NULL };// 10 per line
 PCHAR DefaultStartAt[] = { "99","100", "100", "100", "100", "100", "100", "100", "100", "100",
 "99","100", "99", "17", "50", "100", "100", "80", "80", "80",
 "80","70", "100", "80", "100", "80", "99", "99", "100", "100",
@@ -970,6 +970,7 @@ void CheckMemmedSpells()
 							SpellType(pSpell);
 							vMemmedSpells[nGem].CheckFunc = NULL; // temp code this needs replaced once i dont crash
 							::strcpy(vMemmedSpells[nGem].SpellCat, spellType);
+							vMemmedSpells[nGem].SpellTypeOption = spellTypeInt;
 							int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0;
 							for (int x = 0; DefaultSection[x]; x++)
 							{
@@ -1036,7 +1037,7 @@ void CheckMemmedSpells()
 							if(vMemmedSpells[nGem].SpellTypeOption!=::OPTIONS::ZERO)
 								WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
 							else
-								WriteChatf("\arMQ2Bot\aw::\ayDetected: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
+								WriteChatf("\arMQ2Bot\aw::\amDetected: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
 							for (int i = 0; i < vMaster.size(); i++)
 							{
 								if (vMaster[i].Spell == vMemmedSpells[nGem].Spell)
@@ -1318,7 +1319,7 @@ bool ShouldICastDetrimental(_BotSpells &spell)
 
 bool sortByPriority(const BotSpells &lhs, const BotSpells &rhs) { return lhs.Priority > rhs.Priority; } // Sort spell vectors by priority
 
-void SortSpellVector(vector<_BotSpells> v)  // the actual sorting of a spell vector by priority
+void SortSpellVector(vector<_BotSpells> &v)  // the actual sorting of a spell vector by priority
 {
 	sort(v.begin(), v.end(), sortByPriority);
 }
@@ -1687,7 +1688,7 @@ void CreateAA()
 						if (strstr(szTemp, "Inquisitor's Judg"))
 							::sprintf(szTemp, "Inquisitor's Judgement");
 					::strcpy(spell.SpellName, szTemp);
-					spell.CanIReprioritize = 0;
+					spell.CanIReprioritize = 0; // i dont think i need this variable any more
 					spell.ID = aa->ID;
 					spell.SpellTypeOption = ::OPTIONS::AA;
 					spell.CheckFunc = CheckAA;
@@ -1762,16 +1763,19 @@ void CreateDisc()
 		{
 			::sprintf(szSpellGem, "Spell%dGem", i);
 			GetPrivateProfileString(INISection, szSpellGem, NULL, szTempGem, MAX_STRING, INIFileName);
-			if (stristr(szTempGem, "disc"))
+			if (strstr(strlwr(szTempGem), "disc"))
 			{
 				for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
 				{
 					if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(nCombatAbility)) {
 						if (PSPELL pSpell = GetSpellByID(pPCData->GetCombatAbility(nCombatAbility)))
 						{
-							tempSpell[pSpell->CARecastTimerID] = pSpell;
-							tempLevel[pSpell->CARecastTimerID] = pSpell->ClassLevel[GetCharInfo()->pSpawn->Class];
-							noOverwrite[pSpell->CARecastTimerID] = 1;
+							if (strstr(pSpell->Name, szTemp))
+							{
+								tempSpell[pSpell->CARecastTimerID] = pSpell;
+								tempLevel[pSpell->CARecastTimerID] = pSpell->ClassLevel[GetCharInfo()->pSpawn->Class];
+								noOverwrite[pSpell->CARecastTimerID] = 1;
+							}
 						}
 					}
 				}
@@ -1826,6 +1830,7 @@ void CreateDisc()
 			disc.CheckFunc = CheckDisc;
 			disc.SpellTypeOption = ::OPTIONS::DISC;
 			disc.ID = tempSpell[i]->ID;
+			disc.CanIReprioritize = 1;
 			::strcpy(disc.Gem, "disc");
 			vTemp.push_back(disc);
 		}
@@ -2054,11 +2059,22 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	DurationSetup();
 	CreateAA();
 	CreateDisc();
-	//CreateHeal();
+	CreateHeal();
 
 	CheckMemmedSpells();
-	SortSpellVector(vMemmedSpells);
+	SortSpellVector(vMaster);
 	ConfigureLoaded = true;
+}
+void ListCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
+	if (!InGameOK())
+		return;
+	if (!vMaster.size())
+		return;
+	for (int i = 0; i < vMaster.size();i++)
+	{
+		WriteChatf("\aoSpell%d: \awName: %s%s, \awGem: %s, Priority: %d", i, vMaster[i].Color, vMaster[i].SpellName, vMaster[i].Gem, vMaster[i].Priority);
+	}
 }
 void MemmedCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
@@ -2151,12 +2167,14 @@ void LoadBotSpell(vector<_BotSpells> &v, char VectorName[MAX_STRING])
 void PluginOn()
 {
 	AddCommand("/bot", BotCommand);
+	AddCommand("/botlist", ListCommand);
 	AddCommand("/memmed", MemmedCommand);
 }
 
 void PluginOff()
 {
 	RemoveCommand("/bot");
+	RemoveCommand("/botlist");
 	RemoveCommand("/memmed");
 }
 
