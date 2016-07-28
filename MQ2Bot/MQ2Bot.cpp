@@ -154,8 +154,10 @@ typedef struct _Spawns
 {
 	vector<_BotSpells>	vSpellList;
 	char				SpawnBuffList[MAX_STRING];
-	int					ID;
+	DWORD				ID;
+	bool				Add; // is this a confirmed add?
 	PSPAWNINFO			Spawn;
+	SPAWNINFO			SpawnCopy;
 	bool				NeedsCheck;
 	ULONGLONG			LastChecked;
 	ULONGLONG			Slow;  //mq2 time stamp of when slow should last until, repeat et al for rest
@@ -235,19 +237,26 @@ bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 
 #pragma region VariableDefinitions
 // bool declares
-bool  BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded = false;
+bool	BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded = false, InCombat = false, summoned=false, UseManualAssist=false, UseNetBots=false;
 
 // char declares
-char BodyTypeFix[MAX_STRING] = { 0 }, CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 }, INISection[MAX_STRING] = { 0 }, spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 };
+char	AddList[MAX_STRING] = { 0 },AssistName[MAX_STRING] = { 0 },BodyTypeFix[MAX_STRING] = { 0 }, CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 },
+		INISection[MAX_STRING] = { 0 }, NetBotsName[MAX_STRING] = "NULL", spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 },
+		conColor[MAX_STRING] = { 0 };
+
+// DWORD declares
+DWORD LastBodyID;
 
 // int declares
-int	AnnounceAdds = 1, AnnounceEcho = 1, AnnounceEQBC = 0, AssistAt = 100, AssistRange = 100, DefaultGem = 1, dotExtend = 0, hotExtend = 0, mezExtend = 0;
+int		AnnounceAdds = 1, AnnounceEcho = 1, AnnounceEQBC = 0, AssistAt = 100, AssistRange = 100, DefaultGem = 1, dotExtend = 0, hotExtend = 0, 
+		mezExtend = 0;
 
 // float declares
-float benDurExtend = 0.00, benRngExtend = 1.00, detDurExtend = 0.00, detRngExtend = 1.00, reinforcement = 0.00;
+float	benDurExtend = 0.00, benRngExtend = 1.00, detDurExtend = 0.00, detRngExtend = 1.00, fCampX, fCampY, fCampZ, FightX = 0, FightY = 0, FightZ = 0,
+		reinforcement = 0.00, WarpDistance = 0.00;
 
 // ULONGLONG declares
-ULONGLONG LastAnnouncedSpell = 0, SpellTimer = 0;
+ULONGLONG AssistTimer=0,LastAnnouncedSpell = 0, SpellTimer = 0;
 
 //vector _BotSpell declares
 vector<_BotSpells> vMaster, vMemmedSpells, vTemp;
@@ -257,7 +266,12 @@ vector<int> vClickyPrestige;
 
 // vector PSPELL declares
 vector<PSPELL> vClickySpell;
+
 // vector PSPAWNINFO declares
+_Spawns KillTarget, xNotTargetingMe, xTargetingMe; // we always store the current kill target here
+vector<_Spawns> vGroup, vXTarget, vSpawns; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
+
+
 
 // vector string declares
 vector<string> vClicky;
@@ -267,7 +281,7 @@ std::map<string, string> SpellIf;
 std::map<string, string>::iterator SpellIt;
 
 // deque declares
-deque<PSPAWNINFO>	vAdds, vPossibleAdds;
+deque<_Spawns>	vAdds;
 
 // PCHAR declares
 PCHAR ChatColors[] = { "\ay", "\a-y", "\ao", "\a-o", "\ag", "\a-g", "\ab", "\a-b", "\ar", "\a-r",
@@ -313,7 +327,7 @@ PCHAR DefaultUseOnce[] = { "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0","0","0", NULL };// 10 per line
 
-											// special declares
+// special declares
 OPTIONS	spellTypeInt;
 _BotSpells EndRegenSpell;
 #pragma endregion VariableDefinitions
@@ -330,18 +344,6 @@ inline bool InGameOK()
 static inline BOOL WinState(CXWnd *Wnd)
 {
 	return (Wnd && ((PCSIDLWND)Wnd)->dShow);
-}
-
-// Used by the Adds TLO
-// Returns a SPAWNINFO struct pointer for the requested index from vAdds
-static inline PSPAWNINFO GetAddInfo(unsigned long N)
-{
-	if (!vAdds.size())
-		return NULL;
-	N--;
-	if (N >= vAdds.size())
-		return NULL;
-	return vAdds[N];
 }
 
 static inline LONG GetSpellAttribX(PSPELL spell, int slot) {
@@ -810,6 +812,245 @@ bool SpellStacks(PSPELL pSpell)
 }
 
 #pragma endregion GeneralFunctionDefinitions
+
+#pragma region SpawnFunctionDefinitions
+
+void ConColorSwap(PSPAWNINFO pSpawn)
+{
+	if (!pSpawn)
+		return;
+	if (ConColor(pSpawn) == CONCOLOR_GREY)
+		::sprintf(conColor, "\a-w");
+	if (ConColor(pSpawn) == CONCOLOR_GREEN)
+		::sprintf(conColor, "\ag");
+	if (ConColor(pSpawn) == CONCOLOR_LIGHTBLUE)
+		::sprintf(conColor, "\at");
+	if (ConColor(pSpawn) == CONCOLOR_BLUE)
+		::sprintf(conColor, "\au");
+	if (ConColor(pSpawn) == CONCOLOR_WHITE)
+		::sprintf(conColor, "\aw");
+	if (ConColor(pSpawn) == CONCOLOR_YELLOW)
+		::sprintf(conColor, "\ay");
+	if (ConColor(pSpawn) == CONCOLOR_RED)
+		::sprintf(conColor, "\ay");
+}
+
+void CheckAdds()
+{
+	if (!InGameOK())
+		return;
+	if (!GetCharInfo()->pXTargetMgr)
+		return;
+	char szXTAR[MAX_STRING];
+	char szXTAR2[MAX_STRING];
+	char testAddList[MAX_STRING];
+	int xtar = 0;
+	if (PXTARGETMGR xtm = GetCharInfo()->pXTargetMgr)
+	{
+		vAdds.clear();
+		InCombat = false;
+		int npc = 0;
+		int leastaggro = 100;
+		int mostaggro = 99;
+		_Spawns aggro;
+		xNotTargetingMe = aggro;
+		xTargetingMe = aggro;
+		if (((PCPLAYERWND)pPlayerWnd))
+			if (((CXWnd*)pPlayerWnd)->GetChildItem("PW_CombatStateAnim"))
+				if (((PCPLAYERWND)pPlayerWnd)->CombatState == 0)
+					InCombat = true;
+		try // access spawn data crashes people when something despawns so we need to try, and we need to use memcpy of the data.
+		{
+			if (PXTARGETARRAY xta = xtm->pXTargetArray)
+			{
+				for (DWORD n = 0; n < xtm->TargetSlots; n++)
+				{
+					if (xta->pXTargetData[n].SpawnID>0)
+					{
+						if (xta->pXTargetData[n].xTargetType)
+							::sprintf(szXTAR, "%s", GetXtargetType(xta->pXTargetData[n].xTargetType));
+						PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(xta->pXTargetData[n].SpawnID);
+						if (pSpawn)
+						{
+							_Spawns add;
+							SPAWNINFO tSpawn;
+							memcpy(&tSpawn, pSpawn, sizeof(SPAWNINFO));
+							if (pSpawn && (strstr(szXTAR, "NPC") || strstr(szXTAR, "Hater") || (strstr(szXTAR, "Target") || strstr(szXTAR, "target") || strstr(szXTAR, "_TARGET") && !strstr(szXTAR, "EMPTY")) && InCombat && tSpawn.Type == SPAWN_NPC && tSpawn.Type != SPAWN_CORPSE))
+							{
+								add.Spawn = pSpawn;
+								add.SpawnCopy = tSpawn;
+								add.Add = true;
+								vAdds.push_back(add);
+							}
+							if (pAggroInfo)
+							{
+								if (pAggroInfo->aggroData[AD_xTarget1 + n].AggroPct < leastaggro)
+								{
+									leastaggro = pAggroInfo->aggroData[AD_xTarget1 + n].AggroPct;
+									xNotTargetingMe.SpawnCopy = tSpawn;
+								}
+								if (pAggroInfo->aggroData[AD_xTarget1 + n].AggroPct > mostaggro && !GetSpawnByID(xTargetingMe.ID))
+								{
+									mostaggro = pAggroInfo->aggroData[AD_xTarget1 + n].AggroPct;
+									xTargetingMe.SpawnCopy = tSpawn;
+								}
+							}
+							if (pSpawn && (strstr(szXTAR, "NPC") || strstr(szXTAR, "Target") || strstr(szXTAR, "target") || strstr(szXTAR, "_TARGET") && !strstr(szXTAR, "EMPTY")) && !InCombat && tSpawn.Type == SPAWN_NPC && tSpawn.Type != SPAWN_CORPSE)
+							{
+								add.SpawnCopy = tSpawn;
+								add.Spawn = pSpawn;
+								add.Add = false;
+								vAdds.push_back(add);
+							}
+						}
+					}
+				}
+			}
+		}
+		catch (...)
+		{
+			DebugSpewAlways("MQ2Bot::CheckAdds() **Exception** 1");
+		}
+	}
+
+	if (UseManualAssist && strlen(AssistName)>3)
+	{
+		int doAssist = 0;
+		PCHARINFO pChar = GetCharInfo();
+		char assist[MAX_STRING];
+		::sprintf(assist, "/squelch /assist %s", AssistName);
+		if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget)
+		{
+			if (DistanceToSpawn(pChar->pSpawn, pMyTarget) > AssistRange && MQGetTickCount64() > AssistTimer)
+				doAssist = 1;
+		}
+		else
+		{
+			if (MQGetTickCount64() > AssistTimer)
+				doAssist = 1;
+		}
+
+		if (doAssist)
+		{
+			HideDoCommand(pChar->pSpawn, assist, FromPlugin);
+			AssistTimer = MQGetTickCount64() + 2000LL;
+			vAdds.clear();
+			InCombat = false;
+			if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget)
+			{
+				if (pMyTarget->Type == SPAWN_NPC)
+				{
+					if (((PCPLAYERWND)pPlayerWnd))
+						if (((CXWnd*)pPlayerWnd)->GetChildItem("PW_CombatStateAnim"))
+							if (((PCPLAYERWND)pPlayerWnd)->CombatState == 0)
+								InCombat = true;
+					if (InCombat || DistanceToSpawn(pChar->pSpawn, pMyTarget) < AssistRange && PctHP(pMyTarget)<AssistAt)
+					{
+						SPAWNINFO tSpawn;
+						memcpy(&tSpawn, pMyTarget, sizeof(SPAWNINFO));
+						_Spawns add;
+						add.SpawnCopy = tSpawn;
+						add.Spawn= pMyTarget;
+						add.Add = true;
+						vAdds.push_front(add);
+					}
+					else
+					{
+						SPAWNINFO tSpawn;
+						memcpy(&tSpawn, pMyTarget, sizeof(SPAWNINFO));
+						_Spawns add;
+						add.SpawnCopy = tSpawn;
+						add.Spawn = pMyTarget;
+						add.Add = false;
+						vAdds.push_back(add);
+					}
+				}
+			}
+		}
+	}
+	if (UseNetBots)
+	{
+		::sprintf(testAddList, "${If[${NetBots[%s].InZone} && ${NetBots.Client.Find[%s]} && ${NetBots[%s].TargetID} && ${NetBots[%s].TargetHP}<=%d && (${NetBots[%s].CombatState}==0||${NetBots[%s].Attacking}) && ${Spawn[id ${NetBots[%s].TargetID}].Distance}<=%d,1,0]}", NetBotsName, NetBotsName, NetBotsName, NetBotsName, AssistAt, NetBotsName, NetBotsName, NetBotsName, AssistRange);
+		ParseMacroData(testAddList);
+		if (atoi(testAddList) == 1)
+		{
+			::sprintf(testAddList, "${NetBots[%s].TargetID}", NetBotsName);
+			ParseMacroData(testAddList);
+			bool check = false;
+			for (int i = 0; i < vAdds.size(); i++)
+			{
+				if (vAdds[i].ID == (DWORD)atol(testAddList))
+					check = true;
+			}
+			if (!check)
+			{
+				if (PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID((DWORD)atol(testAddList)))
+				{
+					SPAWNINFO tSpawn;
+					memcpy(&tSpawn, pSpawn, sizeof(SPAWNINFO));
+					_Spawns add;
+					add.SpawnCopy = tSpawn;
+					add.Spawn = pSpawn;
+					add.Add = false;
+					vAdds.push_front(add);
+				}
+			}
+				
+		}
+	}
+	if (vAdds.size() && AnnounceAdds > 0)
+	{
+		::sprintf(szXTAR2, "|");
+		for (int i = 0; i < vAdds.size(); i++)
+		{
+			try
+			{
+				if (vAdds[i].Spawn && vAdds[i].Spawn->Type != SPAWN_CORPSE)
+				{
+					// vAdds[i].Spawn = (PSPAWNINFO)GetSpawnByID(vAdds[i].ID);
+					ConColorSwap(vAdds[i].Spawn);
+					::sprintf(szXTAR, "%s%s\ar|", conColor, vAdds[i].SpawnCopy.Name);
+					strcat(szXTAR2, szXTAR);
+				}
+			}
+			catch(...)
+			{
+				DebugSpewAlways("MQ2Bot::CheckAdds() **Exception** 2");
+			}
+
+		}
+		if (strcmp(AddList, szXTAR2))
+		{
+			::sprintf(AddList, szXTAR2);
+			WriteChatf("\arAdds: %s", szXTAR2);
+		}
+		if (FightX == 0 && FightY == 0 && FightZ == 0)
+		{
+			FightX = GetCharInfo()->pSpawn->X;
+			FightY = GetCharInfo()->pSpawn->Y;
+			FightZ = GetCharInfo()->pSpawn->Z;
+		}
+	}
+	if (vAdds.size())
+	{
+		if (GetSpawnByID(vAdds[0].ID) && vAdds[0].ID != LastBodyID)
+		{
+			::sprintf(BodyTypeFix, "${Spawn[%s].Body}", vAdds[0].SpawnCopy.Name);
+			ParseMacroData(BodyTypeFix);
+			LastBodyID = vAdds[0].ID;
+		}
+
+	}
+	if (!vAdds.size())
+	{
+		summoned = false;
+		FightX = 0;
+		FightY = 0;
+		FightZ = 0;
+		WarpDistance = 0;
+	}
+}
+#pragma endregion SpawnFunctionDefinitions
 
 #pragma region SpellFunctionDefinitions
 
@@ -1308,11 +1549,11 @@ bool ShouldICast(_BotSpells &spell)
 
 bool ShouldICastDetrimental(_BotSpells &spell)
 {
-	if (!vAdds.size() && !vPossibleAdds.size())
+	if (!vAdds.size())
 		return false;
-	if (!vAdds[0])
+	if (!GetSpawnByID(vAdds[0].ID))
 		return false;
-	if (GetDistance(vAdds[0]->X, vAdds[0]->Y) > AssistRange)
+	if (GetDistance(vAdds[0].Spawn->X, vAdds[0].Spawn->Y) > AssistRange)
 		return false;
 	return true;
 }
@@ -1962,6 +2203,7 @@ void CreateHeal()
 void CheckMaster()
 {
 	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+	CheckAdds();
 	CheckMemmedSpells();
 	for (int i = 0; i < vMaster.size(); i++)
 	{
