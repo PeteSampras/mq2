@@ -196,6 +196,7 @@ typedef struct _Spawns
 	int					DetrimentalCounters;
 	ULONGLONG			Hot;
 	ULONGLONG			Fero;
+	BYTE				State;
 } Spawns, *PSpawns, SpawnCopy;
 
 #pragma region FunctionDeclarations
@@ -839,6 +840,8 @@ void CheckAdds()
 {
 	if (!InGameOK())
 		return;
+	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s", CurrentRoutine); // test code
 	if (!GetCharInfo()->pXTargetMgr)
 		return;
 	char szXTAR[MAX_STRING];
@@ -1049,6 +1052,86 @@ void CheckAdds()
 		FightZ = 0;
 		WarpDistance = 0;
 	}
+
+	/* FixNote.
+	Need to check vSpawn, if not there, insert vAdd to there, also double check the vAdds[i].Add flag.
+	*/
+}
+
+void CheckGroup()
+{
+	if (!InGameOK())
+		return;
+	try
+	{
+		::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+		DebugWrite("Checking %s", CurrentRoutine); // test code
+		PCHARINFO pChar = GetCharInfo();
+		if (pChar && !pChar->pGroupInfo)
+		{
+			if (vGroup[0].ID == pChar->pSpawn->SpawnID)
+				return;
+			else
+			{
+				_Spawns gMember;
+				gMember.Spawn = pChar->pSpawn;
+				gMember.ID = pChar->pSpawn->SpawnID;
+				gMember.State = SPAWN_PLAYER;
+				vGroup[0] = gMember;
+				return;
+			}
+		}
+		PSPAWNINFO pGroupMember;
+		char test[MAX_STRING];
+		for (int i = 0; i < 6; i++)
+		{
+			::sprintf(test, "${If[(${Group.Member[%d].Type.Equal[PC]}||${Group.Member[%d].Type.Equal[mercenary]}),1,0]}", i, i);
+			ParseMacroData(test);
+			if (atoi(test) == 1)
+			{
+				if (pChar && pChar->pGroupInfo && pChar->pGroupInfo->pMember[i] && pChar->pGroupInfo->pMember[i]->pSpawn && pChar->pGroupInfo->pMember[i]->pSpawn->SpawnID>0)
+				{
+					if (pChar->pGroupInfo->pMember[i]->pSpawn->Type == SPAWN_PLAYER || pChar->pGroupInfo->pMember[i]->Mercenary)
+					{
+						pGroupMember = pChar->pGroupInfo->pMember[i]->pSpawn;
+						if (pGroupMember && (pGroupMember->RespawnTimer || pGroupMember->StandState == STANDSTATE_DEAD))
+						{
+							_Spawns gMember;
+							gMember.Spawn = pGroupMember;
+							gMember.ID = pGroupMember->SpawnID;
+							gMember.State = STANDSTATE_DEAD;
+							vGroup[i] = gMember;
+						}
+						if (pGroupMember && !pGroupMember->RespawnTimer && pGroupMember->StandState != STANDSTATE_DEAD)
+						{
+							if (pGroupMember->SpawnID != vGroup[i].ID)
+							{
+								_Spawns gMember;
+								gMember.Spawn = pGroupMember;
+								gMember.ID = pGroupMember->SpawnID;
+								gMember.State = SPAWN_PLAYER;
+								vGroup[i] = gMember;
+							}
+						}
+					}
+				}
+			}
+			else
+			{
+				if (vGroup[i].ID)
+				{
+					_Spawns blank;
+					vGroup[i] = blank;
+					vGroup[i].ID = 0;
+				}
+			}
+		}
+	}
+	catch(...)
+	{
+		DebugSpewAlways("MQ2Bot::CheckGroup() **Exception**");
+	}
+	return;
 }
 #pragma endregion SpawnFunctionDefinitions
 
@@ -2093,6 +2176,16 @@ void CreateDisc()
 		vMaster.push_back(vTemp[i]);
 	}
 }
+void CreateGroup()
+{
+	vGroup.clear();
+	_Spawns group;
+	group.ID = 0;
+	for (int i = 0; i < 6;i++)
+	{
+		vGroup.push_back(group);
+	}
+}
 void CreateHeal()
 {
 	if (!InGameOK())
@@ -2203,7 +2296,6 @@ void CreateHeal()
 void CheckMaster()
 {
 	::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
-	CheckAdds();
 	CheckMemmedSpells();
 	for (int i = 0; i < vMaster.size(); i++)
 	{
@@ -2299,6 +2391,7 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	Configure(NULL, 0);
 	DebugWrite("BotCommand");
 	DurationSetup();
+	CreateGroup();
 	CreateAA();
 	CreateDisc();
 	CreateHeal();
@@ -2440,6 +2533,8 @@ PLUGIN_API VOID OnPulse(VOID)
 
 	if (!ConfigureLoaded)
 		return;
+	CheckAdds();
+	CheckGroup();
 	CheckMaster();
 }
 
