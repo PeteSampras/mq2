@@ -1,27 +1,44 @@
 /* notes:
+Specific notes:
+FixNote 20160728.1 - Need to check vSpawn, if not there, insert vAdd to there, also double check the vAdds[i].Add flag.
+FixNote 20160728.2 - this check will need readded for AACutOffTime
+FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
 
-_SPAWNS KillTarget; // we always store the current kill target here
-vector<_Spawns> vGroup, vXTarget, vAdds; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
+General notes overall:
+dont push too far ahead, need to incorporate all the string safety changes ASAP, once we figure out wtf those are.
+this is going to affect every string usage and be an asspain for ini stuff.  Normally i wouldnt care but i dont want any crashes and those seem to happen currenty.
+
+General notes spells:
+Fully flesh out AAs, disc, heals before moving on.  No need to redo all routines 20 times for no reason.
+
+General notes spawns/storage:
+vAdds need checked against vSpawn, the Spawns need to be populated, and then both checked/cleared via OnRemoveSpawn
+KillTarget needs to get set somehow.  can re-use some/most of mq2bot code GetKillTarget() for that.
+Once we have kill target, each detrimental spell needs to have it added to their target struct member.
+
+General notes casting/spell storage:
+I think the CastHandle would actually work as is, but it can be more efficient by adding struct members directly (this is sort of done) so that checks dont need made multiple times for unchanging members.
+
+
+save for later:
 // to use discs: pCharData->DoCombatAbility(vMaster[i].ID);
 try
 {
-if(pSpawn)
-{
-SPAWNINFO tSpawn;
-memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
-RemoveFromNotify(&tSpawn, true);
-}
+	if(pSpawn)
+	{
+	SPAWNINFO tSpawn;
+	memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
+	RemoveFromNotify(&tSpawn, true);
+	}
 }
 catch(...)
 {
-DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
+	DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 }
 
 */
 
 #pragma region Headers
-// Comment out MMOBUGS_LOADER to not use MMOBugs specific code
-#define MMOBUGS_LOADER
 // Can safely ignore these warnings
 //#pragma warning ( disable : 4710 4365 4018 4244 4505 4189 4101 4100 4482 )
 #pragma warning( push )
@@ -158,6 +175,7 @@ typedef struct _Spawns
 	bool				Add; // is this a confirmed add?
 	PSPAWNINFO			Spawn;
 	SPAWNINFO			SpawnCopy;
+	int					Priority;
 	bool				NeedsCheck;
 	ULONGLONG			LastChecked;
 	ULONGLONG			Slow;  //mq2 time stamp of when slow should last until, repeat et al for rest
@@ -220,6 +238,7 @@ void		EQBCSwap(char startColor[MAX_STRING]);
 double		round(double d);
 
 // declaration of spawn functions
+void		CheckGroupPets(int i);
 int			PctEnd(PSPAWNINFO pSpawn);
 int			PctHP(PSPAWNINFO pSpawn);
 int			PctMana(PSPAWNINFO pSpawn);
@@ -270,7 +289,7 @@ vector<PSPELL> vClickySpell;
 
 // vector PSPAWNINFO declares
 _Spawns KillTarget, xNotTargetingMe, xTargetingMe; // we always store the current kill target here
-vector<_Spawns> vGroup, vXTarget, vSpawns; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
+vector<_Spawns> vGroup, vXTarget, vSpawns,vPets; // manage all the various spawns, and if something is mezzed, dont remove it unless it is banished.
 
 
 
@@ -815,7 +834,12 @@ bool SpellStacks(PSPELL pSpell)
 #pragma endregion GeneralFunctionDefinitions
 
 #pragma region SpawnFunctionDefinitions
+bool sortSpawnByPriority(const Spawns &lhs, const Spawns &rhs) { return lhs.Priority > rhs.Priority; } // Sort spell vectors by priority
 
+void SortSpawnVector(vector<_Spawns> &v)  // the actual sorting of a spawn vector by priority
+{
+	sort(v.begin(), v.end(), sortSpawnByPriority);
+}
 void ConColorSwap(PSPAWNINFO pSpawn)
 {
 	if (!pSpawn)
@@ -1053,9 +1077,23 @@ void CheckAdds()
 		WarpDistance = 0;
 	}
 
-	/* FixNote.
+	/* FixNote 20160728.1
 	Need to check vSpawn, if not there, insert vAdd to there, also double check the vAdds[i].Add flag.
 	*/
+	for (int i = 0; i<vAdds.size();i++)
+	{
+		int found = 0;
+		for (int x = 0; x < vSpawns.size();x++)
+		{
+			if(vSpawns[x].ID == vAdds[i].ID)
+			{
+				found++;
+			}
+		}
+		if (!found)
+			vSpawns.push_back(vAdds[i]);
+	}
+	SortSpawnVector(vSpawns);
 }
 
 void CheckGroup()
@@ -1070,7 +1108,25 @@ void CheckGroup()
 		if (pChar && !pChar->pGroupInfo)
 		{
 			if (vGroup[0].ID == pChar->pSpawn->SpawnID)
-				return;
+				if(!pChar->pSpawn->pSpawn->PetID && vPets[0].ID==0||pChar->pSpawn->pSpawn->PetID && pChar->pSpawn->PetID != 0xFFFFFFFF && vPets[0].ID == pChar->pSpawn->PetID)
+					return;
+				else
+				{
+					// FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
+					_Spawns pet;
+					ZeroMemory(&vPets[0], sizeof(vPets[0]));
+					if (!pChar->pSpawn->pSpawn->PetID)
+					{
+						pet.ID = 0;
+						vPets[0] = pet;
+					}
+					else
+					{
+						pet.ID = pChar->pSpawn->pSpawn->PetID;
+						pet.Spawn = (PSPAWNINFO)GetSpawnByID(pChar->pSpawn->pSpawn->PetID);
+						vPets[0] = pet;
+					}
+				}
 			else
 			{
 				_Spawns gMember;
@@ -1096,6 +1152,8 @@ void CheckGroup()
 						pGroupMember = pChar->pGroupInfo->pMember[i]->pSpawn;
 						if (pGroupMember && (pGroupMember->RespawnTimer || pGroupMember->StandState == STANDSTATE_DEAD))
 						{
+							if (vPets[i].ID != 0)
+								CheckGroupPets(i);
 							_Spawns gMember;
 							gMember.Spawn = pGroupMember;
 							gMember.ID = pGroupMember->SpawnID;
@@ -1104,6 +1162,8 @@ void CheckGroup()
 						}
 						if (pGroupMember && !pGroupMember->RespawnTimer && pGroupMember->StandState != STANDSTATE_DEAD)
 						{
+							if (pChar->pSpawn->pSpawn->PetID && pChar->pSpawn->PetID == 0xFFFFFFFF && vPets[i].ID != 0 || pChar->pSpawn->pSpawn->PetID && pChar->pSpawn->PetID != 0xFFFFFFFF && vPets[i].ID == 0)
+								CheckGroupPets(i);
 							if (pGroupMember->SpawnID != vGroup[i].ID)
 							{
 								_Spawns gMember;
@@ -1133,6 +1193,87 @@ void CheckGroup()
 	}
 	return;
 }
+
+void CheckGroupPets(int i)
+{
+	if (!InGameOK())
+		return;
+	try
+	{
+		::strcpy(CurrentRoutine, &(__FUNCTION__[5]));
+		DebugWrite("Checking %s", CurrentRoutine); // test code
+		PCHARINFO pChar = GetCharInfo();
+		if (i == 0)
+		{
+			if (vGroup[0].ID == pChar->pSpawn->SpawnID)
+				if (!pChar->pSpawn->pSpawn->PetID && vPets[0].ID == 0 || pChar->pSpawn->pSpawn->PetID && pChar->pSpawn->PetID != 0xFFFFFFFF && vPets[0].ID == pChar->pSpawn->PetID)
+					return;
+				else
+				{
+					// FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
+					_Spawns pet;
+					ZeroMemory(&vPets[0], sizeof(vPets[0]));
+					if (!pChar->pSpawn->pSpawn->PetID)
+					{
+						pet.ID = 0;
+						vPets[0] = pet;
+					}
+					else
+					{
+						pet.ID = pChar->pSpawn->pSpawn->PetID;
+						pet.Spawn = (PSPAWNINFO)GetSpawnByID(pChar->pSpawn->pSpawn->PetID);
+						vPets[0] = pet;
+					}
+				}
+		}
+		else
+		{
+			PSPAWNINFO pGroupMember;
+			char test[MAX_STRING];
+			::sprintf(test, "${If[(${Group.Member[%d].Type.Equal[PC]}||${Group.Member[%d].Type.Equal[mercenary]}),1,0]}", i, i);
+			ParseMacroData(test);
+			if (atoi(test) == 1)
+			{
+				if (pChar && pChar->pGroupInfo && pChar->pGroupInfo->pMember[i] && pChar->pGroupInfo->pMember[i]->pSpawn && pChar->pGroupInfo->pMember[i]->pSpawn->SpawnID > 0)
+				{
+					if (pChar->pGroupInfo->pMember[i]->pSpawn->Type == SPAWN_PLAYER || pChar->pGroupInfo->pMember[i]->Mercenary)
+					{
+						pGroupMember = pChar->pGroupInfo->pMember[i]->pSpawn;
+						if (pGroupMember && (pGroupMember->RespawnTimer || pGroupMember->StandState == STANDSTATE_DEAD))
+						{
+							if (!pChar->pSpawn->pSpawn->PetID && vPets[i].ID == 0 || pChar->pSpawn->pSpawn->PetID && pChar->pSpawn->PetID != 0xFFFFFFFF && vPets[i].ID == pChar->pSpawn->PetID)
+								return;
+							else
+							{
+								// FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
+								_Spawns pet;
+								ZeroMemory(&vPets[i], sizeof(vPets[i]));
+								if (!pChar->pSpawn->pSpawn->PetID)
+								{
+									pet.ID = 0;
+									vPets[i] = pet;
+								}
+								else
+								{
+									pet.ID = pChar->pSpawn->pSpawn->PetID;
+									pet.Spawn = (PSPAWNINFO)GetSpawnByID(pChar->pSpawn->pSpawn->PetID);
+									vPets[i] = pet;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	catch (...)
+	{
+		DebugSpewAlways("MQ2Bot::CheckGroupPets() **Exception**");
+	}
+	return;
+}
+
+
 #pragma endregion SpawnFunctionDefinitions
 
 #pragma region SpellFunctionDefinitions
@@ -2317,7 +2458,7 @@ void CheckAA(int spell)
 			return;
 	// all the basic checks have cleared, now we need to test the one-offs
 
-	// this check will need readded for AACutOffTime
+	// FixNote 20160728.2 - this check will need readded for AACutOffTime
 	// if (valid && (atol(sTest) <= (AACutoffTime * 60) || named && GetSpawnByID((DWORD)atol(sNamed))))  
 	if (GetCharInfo()->pSpawn->Class == 16 && (!strcmp(vMaster[spell].SpellName, "Savage Spirit") || !strcmp(vMaster[spell].SpellName, "Untamed Rage")))
 	{
@@ -2399,6 +2540,22 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	CheckMemmedSpells();
 	SortSpellVector(vMaster);
 	ConfigureLoaded = true;
+	if (strlen(szLine) != 0)
+	{
+		CHAR Arg1[MAX_STRING] = { 0 }, Arg2[MAX_STRING] = { 0 };
+		GetArg(Arg1, szLine, 1);
+		if (!_stricmp(Arg1, "populate"))
+		{
+			GetArg(Arg2, szLine, 2);
+			if (strlen(Arg2) != 0)
+			{
+				if (!_stricmp(Arg2, "spell"))
+				{
+					PopulateIni(vMaster, "Spell");
+				}
+			}
+		}
+	}
 }
 void ListCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
@@ -2497,7 +2654,7 @@ void LoadBotSpell(vector<_BotSpells> &v, char VectorName[MAX_STRING])
 
 		}
 	}
-	PopulateIni(v, VectorName);
+	// PopulateIni(v, VectorName);
 }
 void PluginOn()
 {
