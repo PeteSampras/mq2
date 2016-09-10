@@ -5,8 +5,7 @@ FixNote 20160728.2 - this check will need readded for AACutOffTime
 FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
 
 General notes overall:
-dont push too far ahead, need to incorporate all the string safety changes ASAP, once we figure out wtf those are.
-this is going to affect every string usage and be an asspain for ini stuff.  Normally i wouldnt care but i dont want any crashes and those seem to happen currenty.
+Safety string and POSIX updates complete.  
 
 General notes spells:
 Fully flesh out AAs, disc, heals before moving on.  No need to redo all routines 20 times for no reason.
@@ -55,7 +54,6 @@ catch(...)
 #include <deque>
 #include <Windows.h>
 #include <stdio.h>
-#include "../MQ2VladUtil/MQ2Vlad.h"
 #include <algorithm>
 PreSetup("MQ2Bot");
 
@@ -2711,6 +2709,21 @@ PLUGIN_API VOID OnPulse(VOID)
 	CheckMaster();
 }
 
+// This is called each time a spawn is removed from a zone (removed from EQ's list of spawns). 
+// It is NOT called for each existing spawn when a plugin shuts down. 
+PLUGIN_API VOID OnRemoveSpawn(PSPAWNINFO pSpawn)
+{
+	if (gGameState == GAMESTATE_INGAME)
+	{
+		//Compare to spawn lists
+		if (pSpawn) {
+			SPAWNINFO tSpawn;
+			memcpy(&tSpawn, pSpawn, sizeof(SPAWNINFO));
+			// check against vSpawn/vAdds
+			//RemoveFromNotify(&tSpawn, true);
+		}
+	}
+}
 #pragma endregion Loading
 
 #pragma region UnusedCode
@@ -3085,6 +3098,7 @@ bool Moving() {
 }
 
 void StopEnding() {
+	char flag[MAX_STRING] = { 0 };
 	if (MoveS != FLAG_COMPLETE) {
 		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Stick UnPause Request.", MQGetTickCount64());
 		Stick("unpause");
@@ -3092,7 +3106,8 @@ void StopEnding() {
 	}
 	if (MoveA != FLAG_COMPLETE) {
 		DebugWrite("[%llu] MQ2Bot:[Immobilize]: AdvPath UnPause Request.", MQGetTickCount64());
-		Execute("/varcalc PauseFlag 0");
+		sprintf_s(flag, "/varcalc PauseFlag 0");
+		HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
 		MoveA = FLAG_COMPLETE;
 	}
 	if (MoveF != FLAG_COMPLETE) {
@@ -3108,6 +3123,7 @@ void StopEnding() {
 }
 
 void StopHandle() {
+	char flag[MAX_STRING] = { 0 };
 	if (StopF == FLAG_REQUEST) {
 		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Request.", MQGetTickCount64());
 		StopM = MQGetTickCount64() + (ULONGLONG)DELAY_STOP;
@@ -3121,7 +3137,8 @@ void StopHandle() {
 	}
 	if (Evaluate("${If[${Bool[${FollowFlag}]},1,0]}")) {
 		DebugWrite("[%llu] MQ2Bot:[Immobilize]: AdvPath Pause Request.", MQGetTickCount64());
-		Execute("/varcalc PauseFlag 1");
+		sprintf_s(flag, "/varcalc PauseFlag 1");
+		HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
 		MoveA = FLAG_PROGRESS1;
 	}
 	if (Evaluate("${If[${AdvPath.Following} && !${AdvPath.Paused},1,0]}")) {
@@ -3211,7 +3228,7 @@ void MemoHandle() {
 	}
 	if (MemoF == FLAG_COMPLETE && (pSpellBookWnd && (PCSIDLWND)pSpellBookWnd->dShow)) {
 		DebugWrite("[%llu] MQ2Bot:[Memorize]: Closebook.", MQGetTickCount64());
-		Execute("/book");
+		EzCommand("/book");
 	}
 }
 
@@ -3226,21 +3243,21 @@ void DuckHandle() {
 			if (!DuckM) {
 				DebugWrite("[%llu] MQ2Bot:[Duck]: Dismount.", MQGetTickCount64());
 				DuckM = MQGetTickCount64();
-				Execute("/dismount");
+				EzCommand("/dismount");
 			}
 		}
 		else DuckF = FLAG_PROGRESS2;
 	}
 	if (DuckF == FLAG_PROGRESS2) {
 		DebugWrite("[%llu] MQ2Bot:[Duck]: StopCast.", MQGetTickCount64());
-		Execute("/stopcast");
+		EzCommand("/stopcast");
 		CastingE = CAST_ABORTED;
 		DuckF = FLAG_COMPLETE;
 	}
 }
 
 void CastHandle(_BotSpells &spell) {
-
+	char flag[MAX_STRING] = { 0 };
 	// we got the casting request cookies, request immobilize/memorize if needed.
 	if (CastF == FLAG_REQUEST) {
 		DebugWrite("[%llu] MQ2Bot:[Casting]: Request.", MQGetTickCount64());
@@ -3329,20 +3346,31 @@ void CastHandle(_BotSpells &spell) {
 		if ((long)GetCharInfo()->pSpawn->CastingData.SpellID>0) {
 			CastingX = (CastingE<CAST_SUCCESS) ? CAST_SUCCESS : CastingE;
 			CastingL = CastingC;
-			if (CastK == TYPE_SPELL)     Execute("/multiline ; /stopsong ; /cast \"%s\"", CastN);
+			if (CastK == TYPE_SPELL) {
+				sprintf_s(flag, "/multiline ; /stopsong ; /cast \"%s\"", CastN);
+				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
+			}
 			else if (CastK == TYPE_AA) {
-				Execute("/alt activate %d", spell.ID);
+				sprintf_s(flag, "/alt activate %d", spell.ID);
+				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
 			}
 			else if (CastK == TYPE_ITEM) {
-				Execute("/multiline ; /stopsong ; /useitem \"%s\"", CastN);
+				sprintf_s(flag, "/multiline ; /stopsong ; /useitem \"%s\"", CastN);
+				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
 			}
 		}
 		else {
 			char castN[MAX_STRING];
 			sprintf_s(castN, "\"%s\"", spell.SpellName);
 			if (CastK == TYPE_SPELL)     Cast(GetCharInfo()->pSpawn, castN);
-			else if (CastK == TYPE_AA)  Execute("/alt activate %d", spell.ID);
-			else if (CastK == TYPE_ITEM) Execute("/multiline ; /stopsong ; /useitem \"%s\"", CastN);
+			else if (CastK == TYPE_AA) {
+				sprintf_s(flag, "/alt activate %d", spell.ID);
+				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
+			}
+			else if (CastK == TYPE_ITEM) {
+				sprintf_s(flag, "/multiline ; /stopsong ; /useitem \"%s\"", CastN);
+				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
+			}
 		}
 		Announce(spell);
 	}
