@@ -55,6 +55,12 @@ catch(...)
 #include <Windows.h>
 #include <stdio.h>
 #include <algorithm>
+#ifndef MMOBUGS
+	extern char PLUGIN_NAME[MAX_PATH];
+	#define PreSetup(pluginname) CHAR INIFileName[MAX_PATH]={0};\
+#else
+	
+#endif
 PreSetup("MQ2Bot");
 
 // defines
