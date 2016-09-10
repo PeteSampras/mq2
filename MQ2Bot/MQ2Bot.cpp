@@ -57,7 +57,6 @@ catch(...)
 #include <algorithm>
 #ifndef MMOBUGS
 	extern char PLUGIN_NAME[MAX_PATH];
-	#define PreSetup(pluginname) CHAR INIFileName[MAX_PATH]={0};\
 #else
 	
 #endif
