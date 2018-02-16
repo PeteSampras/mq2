@@ -9,7 +9,6 @@
 //place all headers in this region
 #pragma region Headers
 
-#define MMOBUGS_LOADER
 #include "../MQ2Plugin.h"
 #pragma endregion Headers
 
