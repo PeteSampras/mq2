@@ -10,10 +10,7 @@
 #pragma region Headers
 
 #define MMOBUGS_LOADER
-
 #include "../MQ2Plugin.h"
-#include "../MMOBugs.h"
-#include "../MQ2MMOBugs/CSL.h"
 #pragma endregion Headers
 
 PreSetup("MQ2Farm");
