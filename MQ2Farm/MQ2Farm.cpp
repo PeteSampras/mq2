@@ -98,7 +98,8 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
     else
     {
         CHAR Arg[MAX_STRING];
-        for (int i=1;i++;i<100)
+        bool bFound=false;
+        for (int i=1;i<100;i++)
         {
             GetArg(Arg, szLine, i);
             if(strlen(szLine)==0)
@@ -106,17 +107,26 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
             else
             {
                 if (IsNumber(Arg))
+                {
                     iPullRange = atoi(Arg);
+                    bFound;
+                }
                 else
                     vFarmMobs.push_back(Arg);
             }
         }
+        if(bFound)
+        {
+            std::string str1 = szLine;
+            str1.replace(str1.find(itoa(iPullRange)), "");
+            sprintf_s(szLine, "%s", str1.c_str());
+        }
+        WriteChatf("Searching for %s in %d radius", szLine,iPullRange);
     }
-    WriteChatf("Searching for %s in %d radius", szFarmMob,iPullRange);
+
 }
 #pragma endregion Commands
 
-            GetArg(Arg2, szLine, 2);
 // Call to activate plugin.
 // Add commands, aliases, datatypes, benchmarks, UI files, detours, etc.
 void PluginOn()
