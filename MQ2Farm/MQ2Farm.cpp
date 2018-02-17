@@ -139,7 +139,7 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
         bool bFound = false;
         for(int i=0;vIgnoreMobs.size();i++)
         {
-            if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
+            if(!_stricmp(i<vIgnoreMobs.at(0).c_str(),szName))
                 bFound=true;
         }
         if(!bFound)
@@ -161,7 +161,7 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
         szName[MAX_STRING] = {0};
         sprintf_s(szName,"%s",pMyTarget->DisplayedName);
         bool bFound = false;
-        for(int i=0;vIgnoreMobs.size();i++)
+        for(int i=0;i<vIgnoreMobs.size();i++)
         {
             if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
                 bFound=true;
