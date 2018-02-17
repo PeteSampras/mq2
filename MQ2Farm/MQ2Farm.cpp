@@ -16,10 +16,18 @@
 using namespace std;
 #pragma endregion Headers
 
+#ifdef MMOBUGS
 PreSetup("MQ2Farm");
+#else
+char PLUGIN_NAME[MAX_PATH];\
+PreSetup("MQ2Farm");\
+strcpy_s(PLUGIN_NAME, pluginname); \
+
+#endif
 
 #pragma region Defines
 #define TargetIT(X)			*(PSPAWNINFO*)ppTarget=X
+//#define Convert(X) _itoa_s(X,szTemp,10)
 #pragma endregion Defines
 
 
@@ -662,6 +670,7 @@ void Configure(char szCustomIni[MAX_STRING], int force)
 	WritePrivateProfileString(INISection, "BotCommandsOn", BotCommandsOn, INIFileName);
 	WritePrivateProfileString(INISection, "BotCommandsOff", BotCommandsOff, INIFileName);
 	*/
+
 	_itoa_s(iPullRange, szTemp, 10);
 	WritePrivateProfileString(INISection, "PullRange", szTemp, INIFileName);
 	_itoa_s(MinLevel, szTemp, 10);
