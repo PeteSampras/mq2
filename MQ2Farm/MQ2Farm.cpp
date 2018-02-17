@@ -140,7 +140,10 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
             if (!_stricmp(Arg1, "remove"))
                 bRemove=true;
             if (!_stricmp(Arg1, "clear"))
+            {
                 vIgnoreMobs.clear();
+                WriteChatf("Ignore list cleared");
+            }
 
     }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
@@ -155,6 +158,7 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
                 if(bRemove)
                 {
                     vIgnoreMobs.erase(vIgnoreMobs.begin()+i);
+                    WriteChatf("Removed %s from ignore list.",szName);
                     break;
                 }
                 bFound=true;
@@ -182,7 +186,10 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
             if (!_stricmp(Arg1, "remove"))
                 bRemove=true;
             if (!_stricmp(Arg1, "clear"))
+            {
                 vIgnoreMobs.clear();
+                WriteChatf("Ignore list cleared");
+            }
 
     }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
@@ -197,6 +204,7 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
                 if(bRemove)
                 {
                     vIgnoreMobs.erase(vIgnoreMobs.begin()+i);
+                    WriteChatf("Removed %s from ignore list.",szName);
                     break;
                 }
                 bFound=true;
@@ -207,6 +215,7 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
             vIgnoreMobs.push_back(szName);
             WriteChatf("%s added to ignore list.",szName);
         }
+        EzCommand("/squelch /target clear");
     }
     else
     {
