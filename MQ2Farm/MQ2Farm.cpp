@@ -132,6 +132,17 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
+    bool bRemove = false;
+    if (strlen(szLine) != 0)
+    {
+            CHAR Arg1[MAX_STRING] = { 0 };
+            GetArg(Arg1, szLine, 1);
+            if (!_stricmp(Arg1, "remove"))
+                bRemove=true;
+            if (!_stricmp(Arg1, "clear"))
+                vIgnoreMobs.clear();
+
+    }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
     {
         szName[MAX_STRING] = {0};
@@ -139,8 +150,15 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
         bool bFound = false;
         for(int i=0;i<vIgnoreMobs.size();i++)
         {
-            if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
+            if(!_stricmp(vIgnoreMobs[i].c_str(),szName))
+            {
+                if(bRemove)
+                {
+                    vIgnoreMobs.erase(vIgnoreMobs.begin()+i);
+                    break;
+                }
                 bFound=true;
+            }
         }
         if(!bFound)
         {
@@ -156,6 +174,17 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
+    bool bRemove = false;
+    if (strlen(szLine) != 0)
+    {
+            CHAR Arg1[MAX_STRING] = { 0 };
+            GetArg(Arg1, szLine, 1);
+            if (!_stricmp(Arg1, "remove"))
+                bRemove=true;
+            if (!_stricmp(Arg1, "clear"))
+                vIgnoreMobs.clear();
+
+    }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
     {
         szName[MAX_STRING] = {0};
@@ -163,8 +192,15 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
         bool bFound = false;
         for(int i=0;i<vIgnoreMobs.size();i++)
         {
-            if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
+            if(!_stricmp(vIgnoreMobs[i].c_str(),szName))
+            {
+                if(bRemove)
+                {
+                    vIgnoreMobs.erase(vIgnoreMobs.begin()+i);
+                    break;
+                }
                 bFound=true;
+            }
         }
         if(!bFound)
         {
