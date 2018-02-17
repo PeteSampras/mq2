@@ -8,13 +8,24 @@
 
 //place all headers in this region
 #pragma region Headers
-
 #include "../MQ2Plugin.h"
+#include <Windows.h>
+#include <stdio.h>
+
 #include <vector>
 using namespace std;
 #pragma endregion Headers
 
 PreSetup("MQ2Farm");
+
+#pragma region Defines
+#define ISINDEX() (Index[0])
+#define ISNUMBER() (IsNumber(Index))
+#define GETNUMBER() (atoi(Index))
+#define GETFIRST() Index
+#define TargetIT(X)			*(PSPAWNINFO*)ppTarget=X
+#pragma endregion Defines
+
 
 // place all prototypes in this region
 #pragma region Prototypes
@@ -30,15 +41,16 @@ DWORD Search(char szLine[MAX_STRING]);
 // Place all variables in this region
 #pragma region Variables
 bool activated = false, bDebugging = false;
-char szMyTargetID[MAX_STRING] = {0},IgnoreINISection[MAX_STRING] = { 0 }, IgnoreList[MAX_STRING] = { 0 },INISection[MAX_STRING] = { 0 };
-int iPullRange=0,iZRadius=0,iPulses=0,iPulseDelay=0;
+char szMyTargetID[MAX_STRING] = {0},IgnoreINISection[MAX_STRING] = { 0 }, IgnoreList[MAX_STRING] = { 0 },INISection[MAX_STRING] = { 0 }, 
+ImmuneINIFileName[MAX_PATH] = { 0 };
+int iPullRange=0,iZRadius=0,iPulses=0;
 vector<string> vFarmMobs, vIgnoreMobs;
 
 #pragma endregion Variables
 
 // place all initial settings in this region
 #pragma region Settings
-iPulseDelay=3;
+int iPulseDelay = 3;
 #pragma endregion Settings
 
 // place all Inline functions in this region
@@ -119,38 +131,47 @@ void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 // place all primary functions here
 #pragma region PrimaryFunctions
-DWORD Search(char szLine[MAX_STRING])
+DWORD SearchSpawns(char szIndex[MAX_STRING])
 {
-        unsigned long nth;
-        SEARCHSPAWN ssSpawn;
-        ClearSearchSpawn(&ssSpawn);
-        ssSpawn.FRadius = 999999.0f;
-
-        if (!ISNUMBER()) {
-            nth = 1;
-            ParseSearchSpawn(0, argc, argv, ssSpawn);
-        }
-        else {
-            nth = GETNUMBER();
-            ParseSearchSpawn(1, argc, argv, ssSpawn);
-        }
-        for (unsigned long N = 0; N < gSpawnCount; N++)
-        {
-            if (EQP_DistArray[N].Value.Float>ssSpawn.FRadius && !ssSpawn.bKnownLocation)
-                return false;
-            if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr))
-            {
-                if (--nth == 0)
-                {
-                    Ret.Ptr = EQP_DistArray[N].VarPtr.Ptr;
-                    Ret.Type = pSpawnType;
-                    return true;
-                }
-            }
-        }
-    // No spawn
-    return false;
-    }
+    unsigned long nth;
+    SEARCHSPAWN ssSpawn;
+    ClearSearchSpawn(&ssSpawn);
+    ssSpawn.FRadius = 999999.0f;
+	PCHAR pSearch;
+	if (pSearch = strchr(szIndex, ','))
+	{
+		*pSearch = 0;
+		++pSearch;
+		ParseSearchSpawn(pSearch, &ssSpawn);
+		// nth = atoi(GETFIRST(szIndex)); // have to get the number from the first left of the szIndex to the pSearch
+	}
+	else
+	{
+		if (IsNumberToComma(szIndex))
+		{
+			// nth = atoi(GETFIRST(szIndex)); // have to get the number from the first left of the szIndex to the pSearch
+		}
+		else
+		{
+			nth = 1;
+			ParseSearchSpawn(szIndex, &ssSpawn);
+		}
+	}
+	for (unsigned long N = 0; N < gSpawnCount; N++)
+	{
+		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation)
+			return false;
+		if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr))
+		{
+			if (--nth == 0)
+			{
+				DWORD thingy = 100;
+				return thingy;
+			}
+		}
+	}
+	// No spawn
+	return false;    
 }
 #pragma endregion PrimaryFunctions
 
@@ -160,36 +181,39 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
     if (!InGameOK())
                 return;
-    char buffer[MAX_STRING] = "";
+    char szTemp[MAX_STRING] = "";
+	strcpy_s(szTemp, szLine);
     if (strlen(szLine)==0)
     {
         ListCommands();
     }
     else
     {
-        CHAR Arg[MAX_STRING];
+        CHAR Arg1[MAX_STRING];
         bool bFound=false;
         for (int i=1;i<100;i++)
         {
-            GetArg(Arg, szLine, i);
+            GetArg(Arg1, szLine, i);
             if(strlen(szLine)==0)
                 break;
             else
             {
-                if (IsNumber(Arg))
+                if (IsNumber(Arg1))
                 {
-                    iPullRange = atoi(Arg);
+                    iPullRange = atoi(Arg1);
                     bFound;
                 }
                 else
-                    vFarmMobs.push_back(Arg);
+                    vFarmMobs.push_back(Arg1);
             }
         }
         if(bFound)
         {
+			
             std::string str1 = szLine; //lets create a new string, replace out the number
-            str1.replace(str1.find(itoa(iPullRange)), 1, ""); //actually replace
-            sprintf_s(szLine, "%s", str1.c_str()); // change szLine back to original minus the number
+			_itoa_s(iPullRange, Arg1, 10);
+            str1.replace(str1.find(Arg1), 1, ""); //actually replace
+            sprintf_s(szTemp, "%s", str1.c_str()); // change szLine back to original minus the number
         }
         WriteChatf("Searching for %s in %d radius", szLine,iPullRange);
     }
@@ -233,7 +257,7 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
     }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
     {
-        szName[MAX_STRING] = {0};
+        char szName[MAX_STRING] = {0};
         sprintf_s(szName,"%s",pMyTarget->Name);
         bool bFound = false;
         for(int i=0;i<vIgnoreMobs.size();i++)
@@ -279,7 +303,7 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
     }
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
     {
-        szName[MAX_STRING] = {0};
+        char szName[MAX_STRING] = {0};
         sprintf_s(szName,"%s",pMyTarget->DisplayedName);
         bool bFound = false;
         for(int i=0;i<vIgnoreMobs.size();i++)
@@ -346,7 +370,6 @@ PLUGIN_API VOID InitializePlugin(VOID)
         DebugSpewAlways("Initializing MQ2Farm");
         if (InGameOK())
             PluginOn();
-        InitLib(PLUGIN_NAME);
 }
 
 // Called once, when the plugin is to shutdown
@@ -354,7 +377,6 @@ PLUGIN_API VOID ShutdownPlugin(VOID)
 {
         DebugSpewAlways("Shutting down MQ2Farm");
         PluginOff();
-        FreeLib(PLUGIN_NAME);
 }
 
 // things you want to do when you begin zoning
@@ -410,7 +432,7 @@ PLUGIN_API VOID OnPulse(VOID)
 {
 if(++iPulses < iPulseDelay || !InGameOK())
         return;
-iPulse=0;
+iPulses=0;
 }
 
 // This is called every time WriteChatColor is called by MQ2Main or any plugin,
