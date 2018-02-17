@@ -19,10 +19,6 @@ using namespace std;
 PreSetup("MQ2Farm");
 
 #pragma region Defines
-#define ISINDEX() (Index[0])
-#define ISNUMBER() (IsNumber(Index))
-#define GETNUMBER() (atoi(Index))
-#define GETFIRST() Index
 #define TargetIT(X)			*(PSPAWNINFO*)ppTarget=X
 #pragma endregion Defines
 
