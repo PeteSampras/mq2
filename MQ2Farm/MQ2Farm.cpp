@@ -62,15 +62,27 @@ static inline BOOL WinState(CXWnd *Wnd)
 #pragma region UtilityFunctions
 void CheckAlias()
 {
-        char aliases[MAX_STRING] = "";
-        if (RemoveAlias("/farm"))
-                strcat_s(aliases, " /farm ");
-        if (RemoveAlias("/ignorethis"))
-                strcat_s(aliases, " /ignorethis ");
-        if (RemoveAlias("/ignorethese"))
-                strcat_s(aliases, " /ignorethese ");
-        if (strlen(aliases) > 0)
-                WriteChatf("\ar[MQ2Farm]\ao::\ayWARNING\ao::\awAliases for \ao%s\aw were detected and temporarily removed.", aliases);
+    char aliases[MAX_STRING] = {0};
+    if (RemoveAlias("/farm"))
+        strcat_s(aliases, " /farm ");
+    if (RemoveAlias("/ignorethis"))
+        strcat_s(aliases, " /ignorethis ");
+    if (RemoveAlias("/ignorethese"))
+        strcat_s(aliases, " /ignorethese ");
+    if (RemoveAlias("/imob"))
+        strcat_s(aliases, " /imob ");
+    if (RemoveAlias("/loadignore"))
+        strcat_s(aliases, " /loadignore ");
+    if (strlen(aliases) > 0)
+           WriteChatf("\ar[MQ2Farm]\ao::\ayWARNING\ao::\awAliases for \ao%s\aw were detected and temporarily removed.", aliases);
+  }
+
+LONG Evaluate(PCHAR szLine)
+{
+        char test[MAX_STRING];
+        sprintf_s(test, "${If[%s,1,0]}", szLine);
+        ParseMacroData(test,MAX_STRING);
+        return atoi(test);
 }
 
 void ListCommands()
@@ -83,20 +95,20 @@ void ListCommands()
 
 void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
-	if (!InGameOK())
-		return;
-	else
-		sprintf_s(ImmuneINIFileName, "%s\\macros\\Mob_Ignore_List.ini", gszINIPath);
-	if (!pZoneInfo)
-		return;
-	sprintf_s(IgnoreINISection, "Ignores.%s", ((PZONEINFO)pZoneInfo)->ShortName);
-	GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
-	if (!strcmp(IgnoreList, "|"))
-	{
-		WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
-	}
+        if (!InGameOK())
+                return;
+        else
+                sprintf_s(ImmuneINIFileName, "%s\\macros\\Mob_Ignore_List.ini", gszINIPath);
+        if (!pZoneInfo)
+                return;
+        sprintf_s(IgnoreINISection, "Ignores.%s", ((PZONEINFO)pZoneInfo)->ShortName);
+        GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
+        if (!strcmp(IgnoreList, "|"))
+        {
+                WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
+        }
         CHAR szList[MAX_STRING];
-	sprintf_s(szList, "\arIgnores:\aw%s", IgnoreList);
+        sprintf_s(szList, "\arIgnores:\aw%s", IgnoreList);
 
 }
 
@@ -105,7 +117,39 @@ void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 // place all primary functions here
 #pragma region PrimaryFunctions
+DWORD Search(char szLine[MAX_STRING])
+{
+        unsigned long nth;
+        SEARCHSPAWN ssSpawn;
+        ClearSearchSpawn(&ssSpawn);
+        ssSpawn.FRadius = 999999.0f;
 
+        if (!ISNUMBER()) {
+            nth = 1;
+            ParseSearchSpawn(0, argc, argv, ssSpawn);
+        }
+        else {
+            nth = GETNUMBER();
+            ParseSearchSpawn(1, argc, argv, ssSpawn);
+        }
+        for (unsigned long N = 0; N < gSpawnCount; N++)
+        {
+            if (EQP_DistArray[N].Value.Float>ssSpawn.FRadius && !ssSpawn.bKnownLocation)
+                return false;
+            if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr))
+            {
+                if (--nth == 0)
+                {
+                    Ret.Ptr = EQP_DistArray[N].VarPtr.Ptr;
+                    Ret.Type = pSpawnType;
+                    return true;
+                }
+            }
+        }
+    // No spawn
+    return false;
+    }
+}
 #pragma endregion PrimaryFunctions
 
 #pragma region Commands
@@ -152,21 +196,21 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 void IgnoreMobCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
-	if (!InGameOK())
-		return;
-	if (PSPAWNINFO pSpawn = (PSPAWNINFO)pTarget)
-	{
-		char test[MAX_STRING];
-		sprintf_s(test, "|%s|", pSpawn->DisplayedName);
-		if (!strstr(IgnoreList, test))
-		{
-			sprintf_s(IgnoreList, "%s%s|", IgnoreList, pSpawn->DisplayedName);
-			WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
-			WriteChatf("\ar%s \aw added to Ignores.", pSpawn->DisplayedName);
-			GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
-			WriteChatf("\ar%s", IgnoreList);
-		}
-	}
+        if (!InGameOK())
+                return;
+        if (PSPAWNINFO pSpawn = (PSPAWNINFO)pTarget)
+        {
+                char test[MAX_STRING];
+                sprintf_s(test, "|%s|", pSpawn->DisplayedName);
+                if (!strstr(IgnoreList, test))
+                {
+                        sprintf_s(IgnoreList, "%s%s|", IgnoreList, pSpawn->DisplayedName);
+                        WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
+                        WriteChatf("\ar%s \aw added to Ignores.", pSpawn->DisplayedName);
+                        GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
+                        WriteChatf("\ar%s", IgnoreList);
+                }
+        }
 }
 
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
@@ -276,7 +320,7 @@ AddCommand("/ignorethis", IgnoreThisCommand);
 AddCommand("/ignorethese", IgnoreTheseCommand);
 AddCommand("/imob", IgnoreMobCommand);
 AddCommand("/loadignore", LoadIgnoreCommand);
-
+EzCommand("/loadignore");
 }
 
 // Call to deactivate plugin.
@@ -319,7 +363,7 @@ PLUGIN_API VOID OnBeginZone(VOID)
 // things you want to do once you are done zoning
 PLUGIN_API VOID OnEndZone(VOID)
 {
-
+    EzCommand("/loadignore");
 }
 
 // Called after entering a new zone
