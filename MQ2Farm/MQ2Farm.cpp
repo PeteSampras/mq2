@@ -256,7 +256,8 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
         char szName[MAX_STRING] = {0};
         sprintf_s(szName,"%s",pMyTarget->Name);
         bool bFound = false;
-        for(int i=0;i<vIgnoreMobs.size();i++)
+		int iSize = vIgnoreMobs.size();
+        for(int i=0;i<iSize;i++)
         {
             if(!_stricmp(vIgnoreMobs[i].c_str(),szName))
             {
