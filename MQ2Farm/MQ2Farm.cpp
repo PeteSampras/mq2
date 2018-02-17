@@ -10,6 +10,7 @@
 #pragma region Headers
 
 #include "../MQ2Plugin.h"
+#include <vector>
 #pragma endregion Headers
 
 PreSetup("MQ2Farm");
@@ -18,13 +19,16 @@ PreSetup("MQ2Farm");
 #pragma region Prototypes
 void CheckAlias();
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine);
+void ListCommands();
 #pragma endregion Prototypes
 
 // Place all variables in this region
 #pragma region Variables
 bool activated = false, bDebugging = false;
-char szFarmMob[MAX_STRING] = {0}, szMyTargetID[MAX_STRING] = {0};
+char szMyTargetID[MAX_STRING] = {0};
 int iPullRange=0,iZRadius=0,iPulses=0,iPulseDelay=0;
+vector<string> szFarmMobs;
+
 #pragma endregion Variables
 
 // place all initial settings in this region
@@ -63,6 +67,12 @@ void CheckAlias()
         if (strlen(aliases) > 0)
                 WriteChatf("\ar[MQ2Farm]\ao::\ayWARNING\ao::\awAliases for \ao%s\aw were detected and temporarily removed.", aliases);
 }
+
+void ListCommands()
+{
+    
+}
+
 #pragma endregion UtilityFunctions
 
 
@@ -75,11 +85,34 @@ void CheckAlias()
 
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
-        if (!InGameOK())
+    if (!InGameOK())
                 return;
+    char buffer[MAX_STRING] = "";
+    if (strlen(szLine)==0)
+    {
+        ListCommands();
+    }
+    else
+    {
+        CHAR Arg1[MAX_STRING] = { 0 }, Arg2[MAX_STRING] = { 0 };
+        GetArg(Arg1, szLine, 1);
+        if (IsNumber(Arg1))
+            iPullRange = atoi(Arg1);
+        else
+            strcpy_s(szFarmMob,Arg1);
+        GetArg(Arg2, szLine, 2);
+        if(strlen(Arg2)){
+            if (IsNumber(Arg2))
+                iPullRange = atoi(Arg2);  
+            else
+                strcpy_s(szFarmMob,Arg2);
+        }
+    }
+    WriteChatf("Searching for %s in %d radius", szFarmMob,iPullRange);
 }
 #pragma endregion Commands
 
+            GetArg(Arg2, szLine, 2);
 // Call to activate plugin.
 // Add commands, aliases, datatypes, benchmarks, UI files, detours, etc.
 void PluginOn()
