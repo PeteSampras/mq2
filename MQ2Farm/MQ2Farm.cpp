@@ -137,7 +137,7 @@ void CheckAlias()
     if (RemoveAlias("/loadignore"))
         strcat_s(aliases, " /loadignore ");
     if (strlen(aliases) > 0)
-           WriteChatf("\ar[MQ2Farm]\ao::\ayWARNING\ao::\awAliases for \ao%s\aw were detected and temporarily removed.", aliases);
+           WriteChatf("\ar[MQ2Farm]\ao::\ayWARNING\ao::\awAliases for \ao%s\aw were detected and removed.", aliases);
   }
 
 LONG Evaluate(PCHAR szLine)
@@ -351,7 +351,8 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
         char szName[MAX_STRING] = {0};
         sprintf_s(szName,"%s",pMyTarget->DisplayedName);
         bool bFound = false;
-        for(int i=0;i<vIgnoreMobs.size();i++)
+		int iSize = vIgnoreMobs.size();
+        for(int i=0;i<iSize;i++)
         {
             if(!_stricmp(vIgnoreMobs[i].c_str(),szName))
             {
@@ -393,7 +394,7 @@ void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
 	}
 	CHAR szList[MAX_STRING];
 	sprintf_s(szList, "\arIgnores:\aw%s", IgnoreList);
-
+	WriteChatf("%s", szList);
 }
 #pragma endregion Commands
 
@@ -404,6 +405,7 @@ void PluginOn()
 if(activated)
     return;
 activated=true;
+CheckAlias();
 AddCommand("/farm", FarmCommand);
 AddCommand("/botini", FarmIniCommand);
 AddCommand("/ignorethis", IgnoreThisCommand);
