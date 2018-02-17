@@ -27,7 +27,7 @@ void ListCommands();
 bool activated = false, bDebugging = false;
 char szMyTargetID[MAX_STRING] = {0};
 int iPullRange=0,iZRadius=0,iPulses=0,iPulseDelay=0;
-vector<string> szFarmMobs;
+vector<string> vFarmMobs;
 
 #pragma endregion Variables
 
@@ -70,7 +70,10 @@ void CheckAlias()
 
 void ListCommands()
 {
-    
+    WriteChatf("\ar[MQ2Farm]\ao::\ayCommands Available");
+    WriteChatf("\ar[MQ2Farm]\ao::\ay/farm --- Will output this help menu");
+    WriteChatf("\ar[MQ2Farm]\ao::\ay/ignorethis --- Will ignore your current target");
+    WriteChatf("\ar[MQ2Farm]\ao::\ay/ignorethese --- Will ignore all spawns with this targets clean name");
 }
 
 #pragma endregion UtilityFunctions
@@ -94,18 +97,19 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
     }
     else
     {
-        CHAR Arg1[MAX_STRING] = { 0 }, Arg2[MAX_STRING] = { 0 };
-        GetArg(Arg1, szLine, 1);
-        if (IsNumber(Arg1))
-            iPullRange = atoi(Arg1);
-        else
-            strcpy_s(szFarmMob,Arg1);
-        GetArg(Arg2, szLine, 2);
-        if(strlen(Arg2)){
-            if (IsNumber(Arg2))
-                iPullRange = atoi(Arg2);  
+        CHAR Arg[MAX_STRING];
+        for (int i=1;i++;i<100)
+        {
+            GetArg(Arg, szLine, i);
+            if(strlen(szLine)==0)
+                break;
             else
-                strcpy_s(szFarmMob,Arg2);
+            {
+                if (IsNumber(Arg))
+                    iPullRange = atoi(Arg);
+                else
+                    vFarmMobs.push_back(Arg);
+            }
         }
     }
     WriteChatf("Searching for %s in %d radius", szFarmMob,iPullRange);
