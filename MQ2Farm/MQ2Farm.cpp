@@ -19,12 +19,10 @@ PreSetup("MQ2Farm");
 // place all prototypes in this region
 #pragma region Prototypes
 void CheckAlias();
-LONG Evaluate(PCHAR szLine);
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine);
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine);
 void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine);
 void ListCommands();
-DWORD Search(char szLine[MAX_STRING]);
 #pragma endregion Prototypes
 
 // Place all variables in this region
@@ -188,7 +186,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
         if(bFound)
         {
             std::string str1 = szLine; //lets create a new string, replace out the number
-            str1.replace(str1.find(itoa(iPullRange)), ""); //actually replace
+            str1.replace(str1.find(itoa(iPullRange)), 1, ""); //actually replace
             sprintf_s(szLine, "%s", str1.c_str()); // change szLine back to original minus the number
         }
         WriteChatf("Searching for %s in %d radius", szLine,iPullRange);
