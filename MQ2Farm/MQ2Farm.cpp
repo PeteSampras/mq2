@@ -19,6 +19,8 @@ PreSetup("MQ2Farm");
 #pragma region Prototypes
 void CheckAlias();
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine);
+void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine);
+void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine);
 void ListCommands();
 #pragma endregion Prototypes
 
@@ -60,6 +62,8 @@ static inline BOOL WinState(CXWnd *Wnd)
 void CheckAlias()
 {
         char aliases[MAX_STRING] = "";
+        if (RemoveAlias("/farm"))
+                strcat_s(aliases, " /farm ");
         if (RemoveAlias("/ignorethis"))
                 strcat_s(aliases, " /ignorethis ");
         if (RemoveAlias("/ignorethese"))
@@ -117,14 +121,28 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
         }
         if(bFound)
         {
-            std::string str1 = szLine;
-            str1.replace(str1.find(itoa(iPullRange)), "");
-            sprintf_s(szLine, "%s", str1.c_str());
+            std::string str1 = szLine; //lets create a new string, replace out the number
+            str1.replace(str1.find(itoa(iPullRange)), ""); //actually replace
+            sprintf_s(szLine, "%s", str1.c_str()); // change szLine back to original minus the number
         }
         WriteChatf("Searching for %s in %d radius", szLine,iPullRange);
     }
 
 }
+
+void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
+    if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
+    {
+        
+    }
+}
+
+void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
+    
+}
+
 #pragma endregion Commands
 
 // Call to activate plugin.
@@ -135,6 +153,8 @@ if(activated)
     return;
 activated=true;
 AddCommand("/farm", FarmCommand);
+AddCommand("/ignorethis", IgnoreThisCommand);
+AddCommand("/ignorethese", IgnoreTheseCommand);
 
 }
 
@@ -142,10 +162,13 @@ AddCommand("/farm", FarmCommand);
 // Remove commands, aliases, datatypes, benchmarks, UI files, detours, etc.
 void PluginOff()
 {
-if(!activated)
-    return;
-activated=false;
-
+    if(!activated)
+        return;
+    activated=false;
+    DebugSpewAlways("Shutting down MQ2Farm");
+    RemoveCommand("/farm");
+    RemoveCommand("/ignorethis");
+    RemoveCommand("/ignorethese");
 }
 
 // Called once, when the plugin is to initialize
