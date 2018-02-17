@@ -19,10 +19,12 @@ PreSetup("MQ2Farm");
 // place all prototypes in this region
 #pragma region Prototypes
 void CheckAlias();
+LONG Evaluate(PCHAR szLine);
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine);
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine);
 void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine);
 void ListCommands();
+DWORD Search(char szLine[MAX_STRING]);
 #pragma endregion Prototypes
 
 // Place all variables in this region
