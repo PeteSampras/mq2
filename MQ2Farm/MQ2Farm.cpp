@@ -29,7 +29,7 @@ void ListCommands();
 bool activated = false, bDebugging = false;
 char szMyTargetID[MAX_STRING] = {0};
 int iPullRange=0,iZRadius=0,iPulses=0,iPulseDelay=0;
-vector<string> vFarmMobs;
+vector<string> vFarmMobs, vIgnoreMobs;
 
 #pragma endregion Variables
 
@@ -134,13 +134,48 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
     if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
     {
-        
+        szName[MAX_STRING] = {0};
+        sprintf_s(szName,"%s",pMyTarget->Name);
+        bool bFound = false;
+        for(int i=0;vIgnoreMobs.size();i++)
+        {
+            if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
+                bFound=true;
+        }
+        if(!bFound)
+        {
+            vIgnoreMobs.push_back(szName);
+            WriteChatf("%s added to ignore list.",szName);
+        }
+    }
+    else
+    {
+        WriteChatf("No valid target to add to ignore list.");
     }
 }
 
 void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
-    
+    if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget) // if target exists, then lets execute some code
+    {
+        szName[MAX_STRING] = {0};
+        sprintf_s(szName,"%s",pMyTarget->DisplayedName);
+        bool bFound = false;
+        for(int i=0;vIgnoreMobs.size();i++)
+        {
+            if(!_stricmp(vIgnoreMobs.at(0).c_str(),szName))
+                bFound=true;
+        }
+        if(!bFound)
+        {
+            vIgnoreMobs.push_back(szName);
+            WriteChatf("%s added to ignore list.",szName);
+        }
+    }
+    else
+    {
+        WriteChatf("No valid target to add to ignore list.");
+    }
 }
 
 #pragma endregion Commands
