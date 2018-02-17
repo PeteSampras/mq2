@@ -11,6 +11,7 @@
 
 #include "../MQ2Plugin.h"
 #include <vector>
+using namespace std;
 #pragma endregion Headers
 
 PreSetup("MQ2Farm");
@@ -27,7 +28,7 @@ void ListCommands();
 // Place all variables in this region
 #pragma region Variables
 bool activated = false, bDebugging = false;
-char szMyTargetID[MAX_STRING] = {0};
+char szMyTargetID[MAX_STRING] = {0},IgnoreINISection[MAX_STRING] = { 0 }, IgnoreList[MAX_STRING] = { 0 },INISection[MAX_STRING] = { 0 };
 int iPullRange=0,iZRadius=0,iPulses=0,iPulseDelay=0;
 vector<string> vFarmMobs, vIgnoreMobs;
 
@@ -80,6 +81,25 @@ void ListCommands()
     WriteChatf("\ar[MQ2Farm]\ao::\ay/ignorethese --- Will ignore all spawns with this targets clean name");
 }
 
+void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
+	if (!InGameOK())
+		return;
+	else
+		sprintf_s(ImmuneINIFileName, "%s\\macros\\Mob_Ignore_List.ini", gszINIPath);
+	if (!pZoneInfo)
+		return;
+	sprintf_s(IgnoreINISection, "Ignores.%s", ((PZONEINFO)pZoneInfo)->ShortName);
+	GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
+	if (!strcmp(IgnoreList, "|"))
+	{
+		WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
+	}
+        CHAR szList[MAX_STRING];
+	sprintf_s(szList, "\arIgnores:\aw%s", IgnoreList);
+
+}
+
 #pragma endregion UtilityFunctions
 
 
@@ -128,6 +148,25 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
         WriteChatf("Searching for %s in %d radius", szLine,iPullRange);
     }
 
+}
+
+void IgnoreMobCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
+	if (!InGameOK())
+		return;
+	if (PSPAWNINFO pSpawn = (PSPAWNINFO)pTarget)
+	{
+		char test[MAX_STRING];
+		sprintf_s(test, "|%s|", pSpawn->DisplayedName);
+		if (!strstr(IgnoreList, test))
+		{
+			sprintf_s(IgnoreList, "%s%s|", IgnoreList, pSpawn->DisplayedName);
+			WritePrivateProfileString(IgnoreINISection, "Ignore", IgnoreList, ImmuneINIFileName);
+			WriteChatf("\ar%s \aw added to Ignores.", pSpawn->DisplayedName);
+			GetPrivateProfileString(IgnoreINISection, "Ignore", "|", IgnoreList, MAX_STRING, ImmuneINIFileName);
+			WriteChatf("\ar%s", IgnoreList);
+		}
+	}
 }
 
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
@@ -235,6 +274,8 @@ activated=true;
 AddCommand("/farm", FarmCommand);
 AddCommand("/ignorethis", IgnoreThisCommand);
 AddCommand("/ignorethese", IgnoreTheseCommand);
+AddCommand("/imob", IgnoreMobCommand);
+AddCommand("/loadignore", LoadIgnoreCommand);
 
 }
 
@@ -249,6 +290,8 @@ void PluginOff()
     RemoveCommand("/farm");
     RemoveCommand("/ignorethis");
     RemoveCommand("/ignorethese");
+    RemoveCommand("/imob");
+    RemoveCommand("/loadignore");
 }
 
 // Called once, when the plugin is to initialize
