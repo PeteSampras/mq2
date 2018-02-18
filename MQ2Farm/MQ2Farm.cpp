@@ -11,17 +11,17 @@
 #include "../MQ2Plugin.h"
 #include <Windows.h>
 #include <stdio.h>
-
+#include<math.h>
 #include <vector>
+#include "../MQ2Nav/dependencies/protobuf/src/google/protobuf/util/internal/type_info_test_helper.h"
 using namespace std;
 #pragma endregion Headers
 
 #ifdef MMOBUGS
 PreSetup("MQ2Farm");
 #else
-char PLUGIN_NAME[MAX_PATH];\
+char PLUGIN_NAME[MAX_PATH] = "MQ2Farm";\
 PreSetup("MQ2Farm");\
-strcpy_s(PLUGIN_NAME, pluginname); \
 
 #endif
 
@@ -147,6 +147,7 @@ LONG Evaluate(PCHAR szLine)
         ParseMacroData(test,MAX_STRING);
         return atoi(test);
 }
+
 
 void ListCommands()
 {
@@ -680,9 +681,9 @@ void Configure(char szCustomIni[MAX_STRING], int force)
 	WritePrivateProfileString(INISection, "MaxLevel", szTemp, INIFileName);
 	_itoa_s(bLoS, szTemp, 10);
 	WritePrivateProfileString(INISection, "LineOfSight", szTemp, INIFileName);
-	_itoa_s(ZRadius, szTemp, 10);
+	sprintf_s(szTemp,"%f",ZRadius);
 	WritePrivateProfileString(INISection, "ZRadius", szTemp, INIFileName);
-	_itoa_s(FRadius, szTemp, 10);
+	sprintf_s(szTemp, "%f", FRadius);
 	WritePrivateProfileString(INISection, "Radius", szTemp, INIFileName);
 	_itoa_s(bNamed, szTemp, 10);
 	WritePrivateProfileString(INISection, "NamedMobs", szTemp, INIFileName);
