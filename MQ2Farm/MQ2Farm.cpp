@@ -11,9 +11,7 @@
 #include "../MQ2Plugin.h"
 #include <Windows.h>
 #include <stdio.h>
-#include<math.h>
 #include <vector>
-#include "../MQ2Nav/dependencies/protobuf/src/google/protobuf/util/internal/type_info_test_helper.h"
 using namespace std;
 #pragma endregion Headers
 
@@ -46,7 +44,7 @@ DWORD Search(char szLine[MAX_STRING]);
 
 // Place all variables in this region
 #pragma region Variables
-bool activated = false, bDebugging = false;
+bool activated = false, bDebugging = false, bPaused=false;
 char szMyTargetID[MAX_STRING] = {0},IgnoreINISection[MAX_STRING] = { 0 }, IgnoreList[MAX_STRING] = { 0 },INISection[MAX_STRING] = { 0 }, 
 ImmuneINIFileName[MAX_PATH] = { 0 };
 int iPullRange=0,iZRadius=0,iPulses=0;
@@ -151,10 +149,16 @@ LONG Evaluate(PCHAR szLine)
 
 void ListCommands()
 {
-    WriteChatf("\ar[MQ2Farm]\ao::\ayCommands Available");
-    WriteChatf("\ar[MQ2Farm]\ao::\ay/farm --- Will output this help menu");
-    WriteChatf("\ar[MQ2Farm]\ao::\ay/ignorethis --- Will ignore your current target");
-    WriteChatf("\ar[MQ2Farm]\ao::\ay/ignorethese --- Will ignore all spawns with this targets clean name");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\atCommands Available");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm \aw--- \atWill output this help menu");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm on \aw--- \atWill turn on farming with INI settings.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm 1000 \aw--- \atWill turn on farming with a radius of 1000.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm ${Target.CleanName} \aw--- \atWill farm your current target with previously stored radius.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farmini CustomNameHere \aw--- \atWill generate/use a custom INI section in Macroquest.ini under [MQ2Farm_CustomNameHere].");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/ignorethis \aw--- \atWill temporarily ignore your current target.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/ignorethese \aw--- \atWill temporarily ignore all spawns with this targets clean name.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/ignorethese \aw--- \atWill ignore the mobs with this targets clean name and save it to Ignore_Mobs.ini in the macros folder.");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/loadignore \aw--- \atWill loadignores from the Ignore_Mobs.ini in the macro folder.");
 }
 
 
@@ -222,6 +226,106 @@ void FarmIniCommand(PSPAWNINFO pChar, PCHAR szLine)
 
 void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
+	if (!InGameOK())
+		return;
+	PCHAR FarmSettings[] = { "PullRange", "MinLevel", "MaxLevel","LineOfSight","ZRadius","Radius","NamedMobs","AvoidAlertMobs","FindAlertMobs", 
+							NULL };
+	char buffer[MAX_STRING] = "";
+	if (strlen(szLine) != 0)
+	{
+		CHAR Arg1[MAX_STRING] = { 0 }, Arg2[MAX_STRING] = { 0 };
+		GetArg(Arg1, szLine, 1);
+		if (!_stricmp(Arg1, "off"))
+		{
+			strcpy_s(buffer, "[MQ2Farm] Deactivated");
+			activated = false;
+			// also need to turn it off, maybe via PluginOff();
+		}
+		else if (!_stricmp(Arg1, "on"))
+		{
+			char szNull[MAX_STRING] = { 0 };
+			Configure(szNull, 0);
+			HideDoCommand(GetCharInfo()->pSpawn, "/farm", FromPlugin);
+			activated = true;
+			HideDoCommand(GetCharInfo()->pSpawn, "/loadignore", FromPlugin);
+			strcpy_s(buffer, "[MQ2Farm] Activated");
+		}
+		else if (!_stricmp(Arg1, "unpause"))
+		{
+			if (bPaused)
+			{
+				bPaused = false;
+				WriteChatf("MQ2Farm \agUnpaused");
+			}
+		}
+		else if (!_stricmp(Arg1, "pause"))
+		{
+			if (!bPaused)
+			{
+				bPaused = true;
+				WriteChatf("MQ2Farm \arPaused");
+			}
+		}
+		else if (strstr(Arg1, "status"))
+		{
+			WriteChatf("[MQ2Farm] Status = %s", !activated ? "OFF" : activated ? "ON" : bPaused ? "Paused" : "Unknown");
+			return;
+		}
+		else
+		{
+			char Var[MAX_STRING], Set[MAX_STRING];
+			GetArg(Var, szLine, 1, FALSE, FALSE, FALSE, '=');
+			GetArg(Set, szLine, 2, FALSE, FALSE, FALSE, '=');
+			int total = atoi(FarmSettings[0]);
+			char szTemp[MAX_STRING] = { 0 };
+			long Class = GetCharInfo()->pSpawn->mActorClient.Class;
+			long Races = GetCharInfo2()->Race;
+			long Level = GetCharInfo2()->Level;
+			sprintf_s(INIFileName, "%s\\%s_%s.ini", gszINIPath, EQADDR_SERVERNAME, GetCharInfo()->Name);
+			sprintf_s(INISection, "%s_%d_%s_%s", PLUGIN_NAME, Level, pEverQuest->GetRaceDesc(Races), pEverQuest->GetClassDesc(Class));
+			DWORD Shrouded = GetCharInfo2()->Shrouded;
+			if (!Shrouded)
+				INISection[strlen(PLUGIN_NAME)] = 0;
+			for (unsigned int i = 0; FarmSettings[i]; i++)
+			{
+				if (!_stricmp(FarmSettings[i], Var))
+				{
+					WritePrivateProfileString(INISection, FarmSettings[i], Set, INIFileName);
+					// Need to pass a buffer
+					char szNull[MAX_STRING] = { 0 };
+					Configure(szNull, 0);
+					WriteChatf("\ayMQ2Farm::\ao%s \awset to \ag%s", FarmSettings[i], Set);
+					/* Save this for later in case you want true debugging
+					if (!_stricmp(FarmSettings[i], "debugging"))
+					{
+						char Filename[MAX_STRING] = { 0 };
+						sprintf_s(Filename, "%s\\MQ2Farm_Debug.log", gszLogPath);
+						if (DEBUG_DUMPFILE)
+						{
+							__try {
+								_unlink(Filename);
+							}
+							__except (EXCEPTION_EXECUTE_HANDLER)
+							{
+							}
+						}
+						WriteChatf("\ar%s\ax::\amDEBUG logging to \at%s\ax is now %s\ax.",
+							PLUGIN_NAME,
+							Filename,
+							DEBUG_DUMPFILE ? "\aoON" : "\agOFF");
+					}
+					*/
+					return;
+				}
+			}
+
+		}
+	}
+	if (strlen(buffer) > 0)
+		WriteChatColor(buffer, USERCOLOR_DEFAULT);
+}
+/* void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
+{
     if (!InGameOK())
                 return;
     char szTemp[MAX_STRING] = {0};
@@ -244,7 +348,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
                 if (IsNumber(Arg1))
                 {
                     iPullRange = atoi(Arg1);
-                    bFound;
+                    bFound=true;
                 }
                 else
                     vFarmMobs.push_back(Arg1);
@@ -264,7 +368,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR szLine)
     }
 
 }
-
+*/
 void IgnoreMobCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
         if (!InGameOK())
@@ -324,6 +428,7 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
             vIgnoreMobs.push_back(szName);
             WriteChatf("%s added to ignore list.",szName);
         }
+		EzCommand("/squelch /target clear");
     }
     else
     {
@@ -403,17 +508,19 @@ void LoadIgnoreCommand(PSPAWNINFO pChar, PCHAR szLine)
 // Add commands, aliases, datatypes, benchmarks, UI files, detours, etc.
 void PluginOn()
 {
-if(activated)
-    return;
-activated=true;
-CheckAlias();
-AddCommand("/farm", FarmCommand);
-AddCommand("/botini", FarmIniCommand);
-AddCommand("/ignorethis", IgnoreThisCommand);
-AddCommand("/ignorethese", IgnoreTheseCommand);
-AddCommand("/imob", IgnoreMobCommand);
-AddCommand("/loadignore", LoadIgnoreCommand);
-EzCommand("/loadignore");
+	if (activated)
+		return;
+	activated = true;
+	CheckAlias();
+	AddCommand("/farm", FarmCommand);
+	AddCommand("/farmini", FarmIniCommand);
+	AddCommand("/ignorethis", IgnoreThisCommand);
+	AddCommand("/ignorethese", IgnoreTheseCommand);
+	AddCommand("/imob", IgnoreMobCommand);
+	AddCommand("/loadignore", LoadIgnoreCommand);
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao:: \aw- \agv1.0 \atWritten by PeteSampras/ChatWithThisName");
+	WriteChatf("\ar[\a-tMQ2Farm\ar]\ao:: \atLets be honest, ChatWithThisName mostly watched, lulz");
+	EzCommand("/loadignore");
 
 
 }
