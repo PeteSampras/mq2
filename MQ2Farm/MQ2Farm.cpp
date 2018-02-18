@@ -437,8 +437,7 @@ void PluginOff()
 PLUGIN_API VOID InitializePlugin(VOID)
 {
         DebugSpewAlways("Initializing MQ2Farm");
-        if (InGameOK())
-            PluginOn();
+        PluginOn();
 }
 
 // Called once, when the plugin is to shutdown
