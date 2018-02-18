@@ -560,9 +560,9 @@ void Configure(char szCustomIni[MAX_STRING], int force)
 	long Level = GetCharInfo2()->Level;
 	sprintf_s(INIFileName, "%s\\%s_%s.ini", gszINIPath, EQADDR_SERVERNAME, GetCharInfo()->Name);
 	sprintf_s(INISection, "%s_%d_%s_%s", PLUGIN_NAME, Level, pEverQuest->GetRaceDesc(Races), pEverQuest->GetClassDesc(Class));
-	//Shrouded = GetCharInfo2()->Shrouded; //this is used if you are shrouded or in an instance
-	//if (!Shrouded)
-	//	INISection[strlen(PLUGIN_NAME)] = 0;
+	DWORD Shrouded = GetCharInfo2()->Shrouded; //this is used if you are shrouded or in an instance
+	if (!Shrouded)
+		INISection[strlen(PLUGIN_NAME)] = 0;
 	strcpy_s(tempINI, INISection);
 	_strlwr_s(szCustomIni, MAX_STRING);
 	if (force && strlen(szCustomIni) > 1 && !strstr(szCustomIni, "default"))
