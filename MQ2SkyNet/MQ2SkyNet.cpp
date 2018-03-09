@@ -958,66 +958,66 @@ PLUGIN_API VOID OnRemoveGroundItem(PGROUNDITEM pGroundItem)
 
 // Mq2nav hooks
 bool NavInitialized() {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavInitialized)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavInitialized"))
+		if (fNavInitialized checkf = (fNavInitialized)GetProcAddress(pLook->hModule, "NavInitialized"))
 			if (checkf()) return true;
 	return false;
 }
 
 bool NavMeshLoaded() {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavMeshLoaded)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavMeshLoaded"))
+		if (fNavMeshLoaded checkf = (fNavMeshLoaded)GetProcAddress(pLook->hModule, "NavMeshLoaded"))
 			if (checkf()) return true;
 	return false;
 }
 bool NavPathActive() {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavPathActive)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavPathActive"))
+		if (fNavPathActive checkf = (fNavPathActive)GetProcAddress(pLook->hModule, "NavPathActive"))
 			if (checkf()) return true;
 	return false;
 }
 bool NavPathPaused() {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavPathPaused)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavPathPaused"))
+		if (fNavPathPaused checkf = (fNavPathPaused)GetProcAddress(pLook->hModule, "NavPathPaused"))
 			if (checkf()) return true;
 	return false;
 }
 bool NavPossible(PCHAR szLine) {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavPossible)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavPossible"))
+		if (fNavPossible checkf = (fNavPossible)GetProcAddress(pLook->hModule, "NavPossible"))
 			if (checkf()) return true;
 	return false;
 }
 float NavPathLength(PCHAR szLine) {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavPathLength)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavPathLength"))
+		if (fNavPathLength checkf = (fNavPathLength)GetProcAddress(pLook->hModule, "NavPathLength"))
 			if (checkf()) return true;
 	return false;
 }
 bool NavCommand(PSPAWNINFO pChar, PCHAR szLine) {
-	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
+	typedef WORD(__cdecl *fNavCommand)(VOID);
 	PMQPLUGIN pLook = pPlugins;
 	while (pLook && _strnicmp(pLook->szFilename, "mq2nav", 8)) pLook = pLook->pNext;
 	if (pLook)
-		if (fEqbcIsConnected checkf = (fEqbcIsConnected)GetProcAddress(pLook->hModule, "NavCommand"))
+		if (fNavCommand checkf = (fNavCommand)GetProcAddress(pLook->hModule, "NavCommand"))
 			if (checkf()) return true;
 	return false;
 }
