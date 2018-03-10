@@ -39,12 +39,17 @@ enum OPTIONS { // used to check routines automatically
 	IMHIT, JOLT, KNOCKBACK, LIFETAP, MAINTANKBUFF, MANA, NUKE, NUKETOT, PET, REZ,
 	ROOT, SELFBUFF, SNARE, SUMMONITEM, SWARM, DISC, CURE, MEZ
 };
-enum CATEGORIES {
+enum CATEGORIES { //used to categorize spells
 	Slow, Malo, Tash, Haste, Root, Snare, Mez, DS, RevDS, Cripple,
 	Charge, Concuss, MindFroze, Charm, Aego, Skin, Focus, Regen, Symbol, Clarity,
-	Pred, Strength, Brells, SV, SE, HybridHP, Growth, Shining, DeepSleep, Hot, Fero
+	Pred, Strength, Brells, SV, SE, HybridHP, Growth, Shining, DeepSleep, Hot, Fero,
+	CATSIZE
 };
 enum SKILLTYPES { TYPE_SPELL = 1, TYPE_AA = 2, TYPE_ITEM = 3, TYPE_DISC = 4 }; // struct for spell data, how to use the spell, and how the spell was used
+
+enum SPAWNTYPE { PC = 1, PCPET = 2, MERCENARY = 3, NPC = 4};
+
+char           Sep[8] = { '"',' ','^','|',':','=','\n',0 }; // separators
 
 struct _BotSpells;
 
@@ -82,39 +87,49 @@ typedef struct _BotSpells // has to be before the FunctionDeclarations because a
 	void(*CheckFunc)(int);
 } BotSpells, *PBotSpells;
 
+typedef struct NetBuff
+{
+	PSPELL				Spell;
+	ULONGLONG			Expires;
+	CATEGORIES			Category;
+	OPTIONS				Option;
+	int					Amount;
+
+} NetBuffs, *PNetBuffs;
+
 typedef struct _Spawns
 {
-	ULONGLONG			Slow;  //mq2 time stamp of when slow should last until, repeat et al for rest
-	ULONGLONG			Malo;
-	ULONGLONG			Tash;
-	ULONGLONG			Haste;
-	ULONGLONG			Root;
-	ULONGLONG			Snare;
-	ULONGLONG			Mez;
-	ULONGLONG			DS;
-	ULONGLONG			RevDS;
-	ULONGLONG			Cripple;
-	ULONGLONG			Charge;
-	ULONGLONG			Concuss;
-	ULONGLONG			MindFroze;
-	ULONGLONG			Charm;
-	ULONGLONG			Aego;
-	ULONGLONG			Skin;
-	ULONGLONG			Focus;
-	ULONGLONG			Regen;
-	ULONGLONG			Symbol;
-	ULONGLONG			Clarity;
-	ULONGLONG			Pred;
-	ULONGLONG			Strength;
-	ULONGLONG			Brells;
-	ULONGLONG			SV;
-	ULONGLONG			SE;
-	ULONGLONG			HybridHP;
-	ULONGLONG			Growth;
-	ULONGLONG			Shining;
-	ULONGLONG			DeepSleep;
-	ULONGLONG			Hot;
-	ULONGLONG			Fero;
+	NetBuff				Slow;  //track all these
+	NetBuff				Malo;
+	NetBuff				Tash;
+	NetBuff				Haste;
+	NetBuff				Root;
+	NetBuff				Snare;
+	NetBuff				Mez;
+	NetBuff				DS;
+	NetBuff				RevDS;
+	NetBuff				Cripple;
+	NetBuff				Charge;
+	NetBuff				Concuss;
+	NetBuff				MindFroze;
+	NetBuff				Charm;
+	NetBuff				Aego;
+	NetBuff				Skin;
+	NetBuff				Focus;
+	NetBuff				Regen;
+	NetBuff				Symbol;
+	NetBuff				Clarity;
+	NetBuff				Pred;
+	NetBuff				Strength;
+	NetBuff				Brells;
+	NetBuff				SV;
+	NetBuff				SE;
+	NetBuff				HybridHP;
+	NetBuff				Growth;
+	NetBuff				Shining;
+	NetBuff				DeepSleep;
+	NetBuff				Hot;
+	NetBuff				Fero;
 	int					PoisonCounters;
 	int					DiseaseCounters;
 	int					CorruptedCounters;
@@ -128,20 +143,27 @@ typedef struct _Spawns
 	int					Priority;
 	bool				NeedsCheck;
 	ULONGLONG			LastChecked;
+	SPAWNTYPE			SpawnType;
 } Spawns, *PSpawns;
 #pragma endregion prototypes
 
 #pragma region variables
 Blech               Packet('#');         // BotInfo Event Triggers
+ULONGLONG           sTimers[CATSIZE];      // Save Timers
+int					iAmount[CATSIZE];
+char                sBuffer[CATSIZE][MAX_STRING]; // Save Buffer
+char                wBuffer[CATSIZE][MAX_STRING]; // Work Buffer
+bool                wChange[CATSIZE];      // Work Change
+bool                wUpdate[CATSIZE];      // Work Update
 
 //vectors
 vector<_Spawns> vGroup, vRaid, vEQBC, vFriends, vAdds;
 
 //bools
-bool DEBUG_DUMPFILE = false, InCombat=false, bSummoned=false;
+bool DEBUG_DUMPFILE = false, InCombat=false, bSummoned=false, bEnabled = false;
 
 //chars
-char CurrentRoutine[MAX_STRING] = { 0 }, conColor[MAX_STRING] = { 0 }, AddList[MAX_STRING] = { 0 }, BodyTypeFix[MAX_STRING] = { 0 };
+char szCurrentRoutine[MAX_STRING] = { 0 }, szConColor[MAX_STRING] = { 0 }, szAddList[MAX_STRING] = { 0 }, szBodyTypeFix[MAX_STRING] = { 0 };
 
 //DWORDS
 DWORD xNotTargetingMe, xTargetingMe, xLastBodyID;
@@ -165,9 +187,8 @@ int AnnounceAdds = 1;
 
 
 #pragma region EQBC
-/*EQBC related code to send information
- *
- */
+//EQBC related code to send information
+
 bool EQBCConnected() {
 	typedef WORD(__cdecl *fEqbcIsConnected)(VOID);
 	PMQPLUGIN pLook = pPlugins;
@@ -194,8 +215,28 @@ void EQBCBroadCast(PCHAR Buffer) {
 	}
 }
 
+bool NetBotsEnabled() {
+	typedef WORD(__cdecl *fNetBotsEnabled)(VOID);
+	PMQPLUGIN pLook = pPlugins;
+	while (pLook && _strnicmp(pLook->szFilename, "mq2netbots", 8)) pLook = pLook->pNext;
+	if (pLook)
+		if (fNetBotsEnabled checkf = (fNetBotsEnabled)GetProcAddress(pLook->hModule, "NetBotsEnabled"))
+			if (checkf()) return true;
+	return false;
+}
+
+PLUGIN_API bool SkyNetEnabled() // Used to check if NetBots is Enabled
+{
+	return bEnabled;
+}
+
 /* NOTE: This all needs to be customized but it is pretty straight forward
 void BroadCast() {
+
+Slow, Malo, Tash, Haste, Root, Snare, Mez, DS, RevDS, Cripple,
+Charge, Concuss, MindFroze, Charm, Aego, Skin, Focus, Regen, Symbol, Clarity,
+Pred, Strength, Brells, SV, SE, HybridHP, Growth, Shining, DeepSleep, Hot, Fero,
+CATSIZE
 	char Buffer[MAX_STRING];
 	long nChange = false;
 	long nUpdate = false;
@@ -306,19 +347,19 @@ void ConColorSwap(PSPAWNINFO pSpawn)
 	if (!pSpawn)
 		return;
 	if (ConColor(pSpawn) == CONCOLOR_GREY)
-		strcpy_s(conColor, "\a-w");
+		strcpy_s(szConColor, "\a-w");
 	if (ConColor(pSpawn) == CONCOLOR_GREEN)
-		strcpy_s(conColor, "\ag");
+		strcpy_s(szConColor, "\ag");
 	if (ConColor(pSpawn) == CONCOLOR_LIGHTBLUE)
-		strcpy_s(conColor, "\at");
+		strcpy_s(szConColor, "\at");
 	if (ConColor(pSpawn) == CONCOLOR_BLUE)
-		strcpy_s(conColor, "\au");
+		strcpy_s(szConColor, "\au");
 	if (ConColor(pSpawn) == CONCOLOR_WHITE)
-		strcpy_s(conColor, "\aw");
+		strcpy_s(szConColor, "\aw");
 	if (ConColor(pSpawn) == CONCOLOR_YELLOW)
-		strcpy_s(conColor, "\ay");
+		strcpy_s(szConColor, "\ay");
 	if (ConColor(pSpawn) == CONCOLOR_RED)
-		strcpy_s(conColor, "\ay");
+		strcpy_s(szConColor, "\ay");
 }
 
 // Returns TRUE if character is in game and has valid character data structures
@@ -444,7 +485,7 @@ VOID DebugWrite(PCHAR szFormat, ...)
 			{
 				strcpy_s(Name, pCharInfo->Name);
 			}
-			sprintf_s(Filename, "%s\\MQ2Bot_%s_%s.log", gszLogPath, EQADDR_SERVERNAME, Name);
+			sprintf_s(Filename, "%s\\MQ2SkyNet_%s_%s.log", gszLogPath, EQADDR_SERVERNAME, Name);
 			ChkCreateDir(gszLogPath);
 			errno_t err = fopen_s(&fOut, Filename, "at");
 			if (err)
@@ -509,11 +550,18 @@ void CheckAdds()
 	char szXTAR[MAX_STRING];
 	char szXTAR2[MAX_STRING];
 	char testAddList[MAX_STRING];
-	int xtar = 0;
+	if(!vAdds.empty())
+	{
+		int iSize = vAdds.size();
+		for (int i = iSize; i != 0; i--)
+		{
+			if (!GetSpawnByID(vAdds[i].ID))
+				vAdds.erase(vAdds.begin() + i);
+		}
+	}
 	if (ExtendedTargetList* etl = GetCharInfo()->pXTargetMgr) //check extended target list
 	{
 		InCombat = false;
-		int npc = 0;
 		int leastaggro = 100;
 		int mostaggro = 99;
 		xNotTargetingMe = NULL;
@@ -653,15 +701,15 @@ void CheckAdds()
 				if (vAdds[i].ID && pSpawn->Type != SPAWN_CORPSE)
 				{
 					ConColorSwap(pSpawn);
-					sprintf_s(szXTAR, "%s%s\ar|", conColor, pSpawn->Name);
+					sprintf_s(szXTAR, "%s%s\ar|", szConColor, pSpawn->Name);
 					strcat_s(szXTAR2, szXTAR);
 				}
 			}
 		}
-		strcpy_s(testAddList, AddList);
-		if (strcmp(AddList, szXTAR2))
+		strcpy_s(testAddList, szAddList);
+		if (strcmp(szAddList, szXTAR2))
 		{
-			strcpy_s(AddList, szXTAR2);
+			strcpy_s(szAddList, szXTAR2);
 			WriteChatf("\arAdds: %s", szXTAR2);
 		}
 		if (fFightX == 0 && fFightY == 0 && fFightZ == 0)
@@ -675,8 +723,8 @@ void CheckAdds()
 	{
 		if (GetSpawnByID(vAdds[0].ID) && vAdds[0].ID != xLastBodyID)
 		{
-			sprintf_s(BodyTypeFix, "${Spawn[%s].Body}", (PSPAWNINFO(GetSpawnByID(vAdds[0].ID))->Name));
-			ParseMacroData(BodyTypeFix, MAX_STRING);
+			sprintf_s(szBodyTypeFix, "${Spawn[%s].Body}", (PSPAWNINFO(GetSpawnByID(vAdds[0].ID))->Name));
+			ParseMacroData(szBodyTypeFix, MAX_STRING);
 			xLastBodyID = vAdds[0].ID;
 		}
 
@@ -697,8 +745,8 @@ void CheckGroup()
 		return;
 	try
 	{
-		strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
-		DebugWrite("Checking %s", CurrentRoutine); // test code
+		strcpy_s(szCurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+		DebugWrite("Checking %s", szCurrentRoutine); // test code
 		PCHARINFO pChar = GetCharInfo();
 		if (pChar && !pChar->pGroupInfo)
 		{
@@ -712,7 +760,7 @@ void CheckGroup()
 		char test[MAX_STRING];
 		for (int i = 0; i < 6; i++)
 		{
-			DebugWrite("Checking %s 5", CurrentRoutine); // test code
+			//DebugWrite("Checking %s", szCurrentRoutine); // test code
 			sprintf_s(test, "${If[(${Group.Member[%d].Type.Equal[PC]}||${Group.Member[%d].Type.Equal[mercenary]}),1,0]}", i, i);
 			ParseMacroData(test, MAX_STRING);
 			if (atoi(test) == 1)
@@ -721,6 +769,11 @@ void CheckGroup()
 				{
 					if (pChar->pGroupInfo->pMember[i]->pSpawn->Type == SPAWN_PLAYER || pChar->pGroupInfo->pMember[i]->Mercenary)
 					{
+						SPAWNTYPE sType;
+						if (pChar->pGroupInfo->pMember[i]->pSpawn->Type == SPAWN_PLAYER)
+							sType = SPAWNTYPE::PC;
+						if (pChar->pGroupInfo->pMember[i]->Mercenary)
+							sType = SPAWNTYPE::MERCENARY;
 						pGroupMember = pChar->pGroupInfo->pMember[i]->pSpawn;
 						if (pGroupMember && (pGroupMember->RespawnTimer || pGroupMember->StandState == STANDSTATE_DEAD))
 						{
@@ -729,6 +782,7 @@ void CheckGroup()
 							_Spawns gMember;
 							gMember.ID = pGroupMember->SpawnID;
 							gMember.State = STANDSTATE_DEAD;
+							gMember.SpawnType = sType;
 							vGroup[i] = gMember;
 						}
 						if (pGroupMember && !pGroupMember->RespawnTimer && pGroupMember->StandState != STANDSTATE_DEAD)
@@ -738,6 +792,7 @@ void CheckGroup()
 								_Spawns gMember;
 								gMember.ID = pGroupMember->SpawnID;
 								gMember.State = SPAWN_PLAYER;
+								gMember.SpawnType = sType;
 								vGroup[i] = gMember;
 							}
 						}
@@ -757,9 +812,9 @@ void CheckGroup()
 	}
 	catch (...)
 	{
-		DebugSpewAlways("MQ2Bot::CheckGroup() **Exception**");
+		DebugSpewAlways("MQ2SkyNet::CheckGroup() **Exception**");
 	}
-	DebugWrite("Checking %s 10", CurrentRoutine); // test code
+	//DebugWrite("Checking %s", szCurrentRoutine); // test code
 	return;
 }
 #pragma endregion CheckFunctions
