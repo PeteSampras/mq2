@@ -1919,7 +1919,7 @@ void SpellCategory(PSPELL pSpell)
 	}
 	if (pSpell->SpellType != 0 && pSpell->Category == 125 && pSpell->Subcategory == 21 && pSpell->TargetType != 6)
 	{
-		for (int x = 0; x < GetSpellNumEffects(pSpell); x++)
+		for (long x = 0; x < GetSpellNumEffects(pSpell); x++)
 		{
 			if (GetSpellAttrib(pSpell, x) == 59)
 			{
