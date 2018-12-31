@@ -23,16 +23,16 @@ save for later:
 // to use discs: pCharData->DoCombatAbility(vMaster[i].ID);
 try
 {
-		if(pSpawn)
-		{
-		SPAWNINFO tSpawn;
-		memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
-		RemoveFromNotify(&tSpawn, true);
-		}
+if(pSpawn)
+{
+SPAWNINFO tSpawn;
+memcpy(&tSpawn,pSpawn,sizeof(SPAWNINFO));
+RemoveFromNotify(&tSpawn, true);
+}
 }
 catch(...)
 {
-		DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
+DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 }
 
 */
@@ -59,12 +59,12 @@ using namespace std;
 #include <algorithm>
 /*
 #ifndef MMOBUGS
-		extern char PLUGIN_NAME[MAX_PATH];
+extern char PLUGIN_NAME[MAX_PATH];
 #else
 
 #endif
 */
-char PLUGIN_NAME[MAX_PATH] = "MQ2Bot";
+char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
 PreSetup("MQ2Bot");
 
 // defines
@@ -137,8 +137,8 @@ enum OPTIONS { // used to check routines automatically
 };
 enum SKILLTYPES { TYPE_SPELL = 1, TYPE_AA = 2, TYPE_ITEM = 3, TYPE_DISC = 4 }; // struct for spell data, how to use the spell, and how the spell was used
 
-// structs
-//struct _BotSpell;
+																			   // structs
+																			   //struct _BotSpell;
 
 typedef struct _BotSpell // has to be before the FunctionDeclarations because a bunch use it
 {
@@ -170,7 +170,7 @@ typedef struct _BotSpell // has to be before the FunctionDeclarations because a 
 	int					CastTime;				// Casting time
 	DWORD				TargetID;				// Id of target i want to cast on
 	int					IniMatch;				// what spell number is this in the ini, if any.
-																							// save this just in case:  void(*CheckFunc)(std::vector<_BotSpell> &, int);
+												// save this just in case:  void(*CheckFunc)(std::vector<_BotSpell> &, int);
 	void(*CheckFunc)(int);
 } BotSpell, *PBotSpell;
 
@@ -288,7 +288,7 @@ ULONGLONG AssistTimer = 0, LastAnnouncedSpell = 0, SpellTimer = 0;
 //vector _BotSpell declares
 //vector<_BotSpell> vMaster, vMemmedSpells, vTemp;
 vector<_BotSpell> vMaster;
-vector<_BotSpell> vMemmedSpells (NUM_SPELL_GEMS-1, _BotSpell());
+vector<_BotSpell> vMemmedSpells(NUM_SPELL_GEMS - 1, _BotSpell());
 vector<_BotSpell> vTemp;
 
 //vector int declares
@@ -303,7 +303,7 @@ vector<_Spawns> vGroup, vXTarget, vSpawns, vPets; // manage all the various spaw
 
 
 
-// vector string declares
+												  // vector string declares
 vector<string> vClicky;
 
 // map declares
@@ -357,7 +357,7 @@ PCHAR DefaultUseOnce[] = { "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0", "0", "0", "0", "0",
 "0","0", "0", "0", "0", "0","0","0", NULL };// 10 per line
 
-// special declares
+											// special declares
 OPTIONS	spellTypeInt;
 _BotSpell EndRegenSpell;
 #pragma endregion VariableDefinitions
@@ -713,11 +713,11 @@ void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 		sprintf_s(szSpell, "%sTotal", VectorName);
 		_itoa_s(v.size(), szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sSpellName%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dName", VectorName, i);
 		WritePrivateProfileString(INISection, szSpell, v[i].SpellName, INIFileName);
 		//sprintf_s(szSpell, "%sSpellIconName%d", VectorName, i);
 		//WritePrivateProfileString(INISection, szSpell, v[i].SpellIconName, INIFileName);
-		sprintf_s(szSpell, "%sIf%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dIf", VectorName, i);
 		if (IsNumber(v[i].If))
 		{
 			_itoa_s(atoi(v[i].If), szTemp, 10);
@@ -726,7 +726,7 @@ void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 
 		else
 			WritePrivateProfileString(INISection, szSpell, v[i].If, INIFileName);
-		sprintf_s(szSpell, "%sGem%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dGem", VectorName, i);
 		if (IsNumber(szSpell))
 		{
 			_itoa_s(atoi(v[i].Gem), szTemp, 10);
@@ -735,25 +735,25 @@ void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 
 		else
 			WritePrivateProfileString(INISection, szSpell, v[i].Gem, INIFileName);
-		sprintf_s(szSpell, "%sUseOnce%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dUseOnce", VectorName, i);
 		_itoa_s(v[i].UseOnce, szTemp, 10);
 
-		sprintf_s(szSpell, "%sForceCast%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dForceCast", VectorName, i);
 		_itoa_s(v[i].ForceCast, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sUse%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dUse", VectorName, i);
 		_itoa_s(v[i].Use, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sStartAt%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dStartAt", VectorName, i);
 		_itoa_s(v[i].StartAt, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sStopAt%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dStopAt", VectorName, i);
 		_itoa_s(v[i].StopAt, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sNamedOnly%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dNamedOnly", VectorName, i);
 		_itoa_s(v[i].NamedOnly, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
-		sprintf_s(szSpell, "%sPriority%d", VectorName, i);
+		sprintf_s(szSpell, "%s%dPriority", VectorName, i);
 		_itoa_s(v[i].Priority, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
 	}
@@ -1351,7 +1351,7 @@ BOOL SpellReady(DWORD index)
 			if (PSPELL pSpell = GetSpellByID(GetMemorizedSpell(nGem)))
 			{
 				if (!_stricmp(mySpell->Name, pSpell->Name))
-					if (((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->SpellGemETA[nGem] && ((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->SpellCooldownETA) {
+					if (((PCDISPLAY)pDisplay)->TimeStamp >((PSPAWNINFO)pLocalPlayer)->SpellGemETA[nGem] && ((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->SpellCooldownETA) {
 						return true;
 					}
 			}
@@ -1540,6 +1540,7 @@ void CheckMemmedSpells()
 								BotSpell spell;
 								vMemmedSpells[nGem] = spell;
 								vMemmedSpells[nGem].ID = 0;
+								change = true;
 								break;
 							}
 						}
@@ -2108,42 +2109,42 @@ void CreateAA()
 	vTemp.clear();
 	strcpy_s(CurrentRoutine, &(__FUNCTION__[6]));
 	PCHAR szAA[] = { "Frenzied Devastation", "Prolonged Destruction", "Improved Sustained Destruction", "Arcane Destruction", "Fury of Kerfyrm", "Fury of Ro", "Sustained Devastation",
-			"Calculated Insanity", "Chromatic Haze", "Improved Reactive Rune", "Reactive Rune", "Illusions of Grandeur", "Improved Twincast",
-			"Sustained Destruction", "Frenzied Burnout", "Virulent Talon", "Fire Core", "Elemental Union", "Visage of Death", "Gift of the Quick Spear",
-			"Heart of Flames", "Heart of Vapor", "Heart of Ice", "Heart of Stone", "Fury of Eci", "Fury of Druzzil",
-			"Valorous Rage", "Rabid Bear", "Group Spirit of the Black Wolf", "Nature's Blessing", "Group Spirit of the White Wolf", "Spirit of the Wood",
-			"Divine Avatar", "Celestial Rapidity", "Silent Casting", "Mercurial Torment", "Funeral Pyre", "Gift of Deathly Resolve",
-			"Group Guardian of the Forest", "Outrider's Accuracy", "Outrider's Attack", "Auspice of the Hunter", "Guardian of the Forest",
-			"Outrider's Evasion", "Imperator's Command", "Wars Sheol's Heroic Blade", "Healing Frenzy", "Flurry of Life", "Roar of Thunder",
-			"Frenzied Swipes", "Chameleon Strike", "Frenzy of Spirit", "Group Bestial Alignment", "Bestial Bloodrage", "Zan Fi's Whistle",
-			"Infusion of Thunder", "Hand of Death", "Embalmer's Carapace", "Bestial Alignment", "Ragged Bite of Agony", "Group Armor of the Inquisitor",
-			"Inquisitor's Judgement", "Armor of the Inquisitor", "Imbued Ferocity", "Soul Flay", "Quick Time", "Fierce Eye",
-			"Selo's Kick", "Bladed Song", "Arcane Fury", "Inquisitor's Judgment", "Dance of Blades", "Channeling the Divine", "Life Burn",
-			"A Tune Stuck in Your Head", "Feral Swipe", "Vehement Rage", "Distraction Attack", "Juggernaut Surge", "Reckless Abandon", "Savage Spirit",
-			"Untamed Rage", "War Cry of the Braxi", "Five Point Palm", "Battle Stomp", "Blinding Fury", "Desperation", "Stunning Kick",
-			"Two-Finger Wasp Touch", "Bloodlust", "Cascading Rage", "6492", "Hand of Tunare", "Thunder of Karana", "Destructive Vortex",
-			"Nature's Fury", "Elemental Arrow", "Reinforced Malaise", "T'Vyl's Resolve", "Flurry of Notes", "Frenzied Kicks", "Rake's Rampage",
-			"War Stomp", "Lyrical Prankster", "Enduring Frenzy", "Rallying Call", "Fleeting Spirit",
-			"Fundament: First Spire of Ancestors", "Fundament: First Spire of Arcanum", "Fundament: First Spire of Divinity",
-			"Fundament: Second Spire of the Elements", "Fundament: First Spire of Enchantment",
-			"Fundament: Third Spire of Holiness", "Fundament: First Spire of Nature", "Fundament: Second Spire of Necromancy",
-			"Fundament: First Spire of Savagery", "Fundament: First Spire of the Minstrels",
-			"Fundament: Second Spire of the Pathfinders", "Fundament: First Spire of the Rake",
-			"Fundament: Third Spire of the Reavers", "Fundament: First Spire of the Savage Lord",
-			"Fundament: First Spire of the Sensei", "Fundament: First Spire of the Warlord", "Fundament: Second Spire of Ancestors",
-			"Fundament: Third Spire of Arcanum", "Fundament: Second Spire of Divinity", "Fundament: Third Spire of the Elements",
-			"Fundament: Third Spire of Enchantment", "Fundament: Second Spire of Holiness", "Fundament: Second Spire of Nature",
-			"Fundament: First Spire of Necromancy", "Fundament: Second Spire of Savagery", "Fundament: Third Spire of the Minstrels",
-			"Fundament: First Spire of the Pathfinders", "Fundament: Third Spire of the Rake", "Fundament: First Spire of the Reavers",
-			"Fundament: Second Spire of the Savage Lord", "Fundament: Third Spire of the Sensei",
-			"Fundament: Second Spire of the Warlord", "Fundament: Third Spire of Ancestors", "Fundament: Second Spire of Arcanum",
-			"Fundament: Third Spire of Divinity", "Fundament: First Spire of the Elements", "Fundament: Second Spire of Enchantment",
-			"Fundament: First Spire of Holiness", "Fundament: Third Spire of Nature", "Fundament: Third Spire of Necromancy",
-			"Fundament: Third Spire of Savagery", "Fundament: Second Spire of the Minstrels",
-			"Fundament: Third Spire of the Pathfinders", "Fundament: Second Spire of the Rake",
-			"Fundament: Second Spire of the Reavers", "Fundament: Third Spire of the Savage Lord",
-			"Fundament: Second Spire of the Sensei", "Fundament: Third Spire of the Warlord",
-			NULL };
+		"Calculated Insanity", "Chromatic Haze", "Improved Reactive Rune", "Reactive Rune", "Illusions of Grandeur", "Improved Twincast",
+		"Sustained Destruction", "Frenzied Burnout", "Virulent Talon", "Fire Core", "Elemental Union", "Visage of Death", "Gift of the Quick Spear",
+		"Heart of Flames", "Heart of Vapor", "Heart of Ice", "Heart of Stone", "Fury of Eci", "Fury of Druzzil",
+		"Valorous Rage", "Rabid Bear", "Group Spirit of the Black Wolf", "Nature's Blessing", "Group Spirit of the White Wolf", "Spirit of the Wood",
+		"Divine Avatar", "Celestial Rapidity", "Silent Casting", "Mercurial Torment", "Funeral Pyre", "Gift of Deathly Resolve",
+		"Group Guardian of the Forest", "Outrider's Accuracy", "Outrider's Attack", "Auspice of the Hunter", "Guardian of the Forest",
+		"Outrider's Evasion", "Imperator's Command", "Wars Sheol's Heroic Blade", "Healing Frenzy", "Flurry of Life", "Roar of Thunder",
+		"Frenzied Swipes", "Chameleon Strike", "Frenzy of Spirit", "Group Bestial Alignment", "Bestial Bloodrage", "Zan Fi's Whistle",
+		"Infusion of Thunder", "Hand of Death", "Embalmer's Carapace", "Bestial Alignment", "Ragged Bite of Agony", "Group Armor of the Inquisitor",
+		"Inquisitor's Judgement", "Armor of the Inquisitor", "Imbued Ferocity", "Soul Flay", "Quick Time", "Fierce Eye",
+		"Selo's Kick", "Bladed Song", "Arcane Fury", "Inquisitor's Judgment", "Dance of Blades", "Channeling the Divine", "Life Burn",
+		"A Tune Stuck in Your Head", "Feral Swipe", "Vehement Rage", "Distraction Attack", "Juggernaut Surge", "Reckless Abandon", "Savage Spirit",
+		"Untamed Rage", "War Cry of the Braxi", "Five Point Palm", "Battle Stomp", "Blinding Fury", "Desperation", "Stunning Kick",
+		"Two-Finger Wasp Touch", "Bloodlust", "Cascading Rage", "6492", "Hand of Tunare", "Thunder of Karana", "Destructive Vortex",
+		"Nature's Fury", "Elemental Arrow", "Reinforced Malaise", "T'Vyl's Resolve", "Flurry of Notes", "Frenzied Kicks", "Rake's Rampage",
+		"War Stomp", "Lyrical Prankster", "Enduring Frenzy", "Rallying Call", "Fleeting Spirit",
+		"Fundament: First Spire of Ancestors", "Fundament: First Spire of Arcanum", "Fundament: First Spire of Divinity",
+		"Fundament: Second Spire of the Elements", "Fundament: First Spire of Enchantment",
+		"Fundament: Third Spire of Holiness", "Fundament: First Spire of Nature", "Fundament: Second Spire of Necromancy",
+		"Fundament: First Spire of Savagery", "Fundament: First Spire of the Minstrels",
+		"Fundament: Second Spire of the Pathfinders", "Fundament: First Spire of the Rake",
+		"Fundament: Third Spire of the Reavers", "Fundament: First Spire of the Savage Lord",
+		"Fundament: First Spire of the Sensei", "Fundament: First Spire of the Warlord", "Fundament: Second Spire of Ancestors",
+		"Fundament: Third Spire of Arcanum", "Fundament: Second Spire of Divinity", "Fundament: Third Spire of the Elements",
+		"Fundament: Third Spire of Enchantment", "Fundament: Second Spire of Holiness", "Fundament: Second Spire of Nature",
+		"Fundament: First Spire of Necromancy", "Fundament: Second Spire of Savagery", "Fundament: Third Spire of the Minstrels",
+		"Fundament: First Spire of the Pathfinders", "Fundament: Third Spire of the Rake", "Fundament: First Spire of the Reavers",
+		"Fundament: Second Spire of the Savage Lord", "Fundament: Third Spire of the Sensei",
+		"Fundament: Second Spire of the Warlord", "Fundament: Third Spire of Ancestors", "Fundament: Second Spire of Arcanum",
+		"Fundament: Third Spire of Divinity", "Fundament: First Spire of the Elements", "Fundament: Second Spire of Enchantment",
+		"Fundament: First Spire of Holiness", "Fundament: Third Spire of Nature", "Fundament: Third Spire of Necromancy",
+		"Fundament: Third Spire of Savagery", "Fundament: Second Spire of the Minstrels",
+		"Fundament: Third Spire of the Pathfinders", "Fundament: Second Spire of the Rake",
+		"Fundament: Second Spire of the Reavers", "Fundament: Third Spire of the Savage Lord",
+		"Fundament: Second Spire of the Sensei", "Fundament: Third Spire of the Warlord",
+		NULL };
 	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING];
 	int aaIndex;
 	PALTABILITY aa;
@@ -2355,8 +2356,8 @@ void CreateHeal()
 	vTemp.clear();
 	strcpy_s(CurrentRoutine, &(__FUNCTION__[6]));
 	PCHAR szHeal[] = { "Divine Arbitration", "Burst of Life", "Beacon of Life", "Focused Celestial Regeneration", "Celestial Regeneration",
-			"Convergence of Spirits", "Union of Spirits", "Focused Paragon of Spirits", "Paragon of Spirit", "Lay on Hands",
-			"Hand of Piety", "Ancestral Aid", "Call of the Ancients", "Exquisite Benediction", "Blessing of Tunare", NULL };
+		"Convergence of Spirits", "Union of Spirits", "Focused Paragon of Spirits", "Paragon of Spirit", "Lay on Hands",
+		"Hand of Piety", "Ancestral Aid", "Call of the Ancients", "Exquisite Benediction", "Blessing of Tunare", NULL };
 	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING] = { 0 }, gem[MAX_STRING] = { 0 };
 	int aaIndex;
 	_ALTABILITY* aa = nullptr;
@@ -2813,7 +2814,7 @@ char          CastN[MAX_STRING];       // Cast SpellName
 
 
 PSPELL        CastS = NULL;              // Cast Spell Pointer
-																				 // Timer Structure
+										 // Timer Structure
 struct TimerSingle {
 	long TimerID;
 	PSPELL pSpell;
@@ -3083,14 +3084,14 @@ void Success(PSPELL Cast) {
 		bool Added = false;
 		/*
 		if (Cast->CastOnYou[0]) {
-				sprintf_s(Temps, "%s#*#", Cast->CastOnYou);
-				aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-				Added = true;
+		sprintf_s(Temps, "%s#*#", Cast->CastOnYou);
+		aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
+		Added = true;
 		}
 		if (Cast->CastOnAnother[0]) {
-				sprintf_s(Temps, "#*#%s#*#", Cast->CastOnAnother);
-				aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-				Added = true;
+		sprintf_s(Temps, "#*#%s#*#", Cast->CastOnAnother);
+		aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
+		Added = true;
 		}
 		*/
 		//20181224:renji
@@ -3445,33 +3446,33 @@ void BotCastCommand(_BotSpell &spell) {
 	if (spell.Spell->TargetType != 14 && spell.Spell->TargetType != 6 && spell.Spell->TargetType != 3 && spell.Spell->TargetType != 41) //&& spell.Spell->TargetType != 45
 		if (PSPAWNINFO Target = (PSPAWNINFO)GetSpawnByID(TargI)) *(PSPAWNINFO*)ppTarget = Target;
 		else Resultat = CAST_NOTARGET;
-	if (Resultat == CAST_SUCCESS && spell.Type == TYPE_SPELL) {
-		if (BardClass) {
-			if (GetCharInfo()->pSpawn->CastingData.SpellID) EzCommand("/stopsong");
-		}
-		CastG = GEMID(spell.ID);
-		if (CastG == NOID) {
-			CastG = atoi(&spell.Gem[(_strnicmp(spell.Gem, "gem", 3)) ? 0 : 3]) - 1;
-			MemoLoad(CastG, spell.Spell);
-			SpellTotal = 1;
-			MemoF = FLAG_REQUEST;
-			MemoE = DONE_SUCCESS;
-		}
+		if (Resultat == CAST_SUCCESS && spell.Type == TYPE_SPELL) {
+			if (BardClass) {
+				if (GetCharInfo()->pSpawn->CastingData.SpellID) EzCommand("/stopsong");
+			}
+			CastG = GEMID(spell.ID);
+			if (CastG == NOID) {
+				CastG = atoi(&spell.Gem[(_strnicmp(spell.Gem, "gem", 3)) ? 0 : 3]) - 1;
+				MemoLoad(CastG, spell.Spell);
+				SpellTotal = 1;
+				MemoF = FLAG_REQUEST;
+				MemoE = DONE_SUCCESS;
+			}
 
-	}
-	if (Resultat != CAST_SUCCESS) {
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)]", MQGetTickCount64(), cast_status[Resultat], Resultat);
-		return;
-	}
-	CastF = FLAG_REQUEST;
-	CastI = spell.Spell;
-	CastK = spell.Type;
-	CastT = spell.CastTime;
-	CastS = spell.Spell;
-	CastM = MQGetTickCount64() + DELAY_CAST;
-	strcpy_s(CastN, spell.SpellName);
-	DebugWrite("[%llu] MQ2Bot:[Casting]: Name<%s> Type<%d>.", MQGetTickCount64(), CastN, CastK);
-	CastHandle(spell);
+		}
+		if (Resultat != CAST_SUCCESS) {
+			DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)]", MQGetTickCount64(), cast_status[Resultat], Resultat);
+			return;
+		}
+		CastF = FLAG_REQUEST;
+		CastI = spell.Spell;
+		CastK = spell.Type;
+		CastT = spell.CastTime;
+		CastS = spell.Spell;
+		CastM = MQGetTickCount64() + DELAY_CAST;
+		strcpy_s(CastN, spell.SpellName);
+		DebugWrite("[%llu] MQ2Bot:[Casting]: Name<%s> Type<%d>.", MQGetTickCount64(), CastN, CastK);
+		CastHandle(spell);
 }
 // NEW end functions
 
