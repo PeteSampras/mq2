@@ -1298,25 +1298,35 @@ BOOL AAReady(DWORD index)
 	return (result < 0);
 }
 
-BOOL DiscReady(char disc[MAX_STRING])
+BOOL DiscReady(PSPELL pSpell)
 {
-	for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
-	{
-		if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(nCombatAbility)) {
-			if (PSPELL pSpell = GetSpellByID(pPCData->GetCombatAbility(nCombatAbility)))
-			{
-				if (!_stricmp(disc, pSpell->Name))
-				{
-					DWORD timeNow = (DWORD)time(NULL);
-					if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow)
-					{
-						return true;
-					}
-				}
-			}
-		}
-	}
-	return false;
+    if (!InGame()) return false;
+    DWORD timeNow = (DWORD)time(NULL);
+    if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow) {
+        if (GetCharInfo()->pSpawn->ManaCurrent >= (int)pSpell->ManaCost && GetCharInfo()->pSpawn->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
+            for (int i = 0; i < 4; i++) {
+                if (pSpell->ReagentCount[i] > 0) {
+                    if (pSpell->ReagentID[i] != -1) {
+                        DWORD count = FindItemCountByID((int)pSpell->ReagentID[i]);
+                        if (count < pSpell->ReagentCount[i]) {
+                            if (PCHAR pitemname = GetItemFromContents(FindItemByID((int)pSpell->ReagentID[i]))->Name) {
+                                WriteChatf("\ap%s\aw needs Reagent: \ay%s x \ag%i", pSpell->Name, pitemname, pSpell->ReagentCount[i]);
+                            }
+                            else {
+                                WriteChatf("%s needs Item ID: %d x \ag%d", pSpell->Name, pSpell->ReagentID[i], pSpell->ReagentCount[i]);
+                            }
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            return false;
+        }
+        return true;
+    }        
+    return false;
 }
 
 BOOL ItemReady(DWORD itemID)
